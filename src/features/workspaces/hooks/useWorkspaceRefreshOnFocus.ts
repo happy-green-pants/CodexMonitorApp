@@ -8,10 +8,11 @@ type WorkspaceRefreshOptions = {
   refreshWorkspaces: () => Promise<WorkspaceInfo[] | void>;
   listThreadsForWorkspaces: (
     workspaces: WorkspaceInfo[],
-    options?: { preserveState?: boolean },
+    options?: { preserveState?: boolean; allWorkspaces?: WorkspaceInfo[] },
   ) => Promise<void>;
   backendMode?: string;
   pollIntervalMs?: number;
+  suspended?: boolean;
 };
 
 export function useWorkspaceRefreshOnFocus({
@@ -20,6 +21,7 @@ export function useWorkspaceRefreshOnFocus({
   listThreadsForWorkspaces,
   backendMode = "local",
   pollIntervalMs = REMOTE_WORKSPACE_REFRESH_INTERVAL_MS,
+  suspended = false,
 }: WorkspaceRefreshOptions) {
   const optionsRef = useRef({
     workspaces,
@@ -27,6 +29,7 @@ export function useWorkspaceRefreshOnFocus({
     listThreadsForWorkspaces,
     backendMode,
     pollIntervalMs,
+    suspended,
   });
   useEffect(() => {
     optionsRef.current = {
@@ -35,6 +38,7 @@ export function useWorkspaceRefreshOnFocus({
       listThreadsForWorkspaces,
       backendMode,
       pollIntervalMs,
+      suspended,
     };
   });
 
@@ -45,6 +49,9 @@ export function useWorkspaceRefreshOnFocus({
 
     const runRefreshCycle = () => {
       if (refreshInFlight) {
+        return;
+      }
+      if (optionsRef.current.suspended) {
         return;
       }
       refreshInFlight = true;
@@ -65,7 +72,10 @@ export function useWorkspaceRefreshOnFocus({
         }
         const connected = latestWorkspaces.filter((entry) => entry.connected);
         if (connected.length > 0) {
-          await listThreads(connected, { preserveState: true });
+          await listThreads(connected, {
+            preserveState: true,
+            allWorkspaces: latestWorkspaces,
+          });
         }
       })().finally(() => {
         refreshInFlight = false;
@@ -79,7 +89,11 @@ export function useWorkspaceRefreshOnFocus({
       }
       const { backendMode: currentBackendMode, pollIntervalMs: intervalMs } =
         optionsRef.current;
-      if (currentBackendMode !== "remote" || document.visibilityState !== "visible") {
+      if (
+        optionsRef.current.suspended ||
+        currentBackendMode !== "remote" ||
+        document.visibilityState !== "visible"
+      ) {
         return;
       }
       pollTimer = setInterval(() => {
@@ -121,5 +135,5 @@ export function useWorkspaceRefreshOnFocus({
         clearInterval(pollTimer);
       }
     };
-  }, [backendMode, pollIntervalMs]);
+  }, [backendMode, pollIntervalMs, suspended]);
 }

@@ -34,6 +34,11 @@ const MobileRemoteWorkspacePrompt = lazy(() =>
     default: module.MobileRemoteWorkspacePrompt,
   })),
 );
+const DirectoryBrowserPrompt = lazy(() =>
+  import("../../workspaces/components/DirectoryBrowserPrompt").then((module) => ({
+    default: module.DirectoryBrowserPrompt,
+  })),
+);
 const BranchSwitcherPrompt = lazy(() =>
   import("../../git/components/BranchSwitcherPrompt").then((module) => ({
     default: module.BranchSwitcherPrompt,
@@ -53,6 +58,13 @@ type ClonePromptState = ReturnType<typeof useClonePrompt>["clonePrompt"];
 type WorkspaceFromUrlPromptState = ReturnType<
   typeof useWorkspaceFromUrlPrompt
 >["workspaceFromUrlPrompt"];
+type DirectoryBrowserPromptState = {
+  currentPath: string | null;
+  entries: import("../../../types").DirectoryEntry[];
+  isLoading: boolean;
+  error: string | null;
+} | null;
+
 type MobileRemoteWorkspacePathPromptState = {
   value: string;
   error: string | null;
@@ -106,6 +118,10 @@ export type AppModalsProps = {
   onMobileRemoteWorkspacePathPromptRecentPathSelect: (path: string) => void;
   onMobileRemoteWorkspacePathPromptCancel: () => void;
   onMobileRemoteWorkspacePathPromptConfirm: () => void;
+  directoryBrowserPrompt: DirectoryBrowserPromptState;
+  onDirectoryBrowserNavigate: (path: string | null) => void;
+  onDirectoryBrowserConfirm: (path: string) => void;
+  onDirectoryBrowserCancel: () => void;
   branchSwitcher: BranchSwitcherState;
   branches: BranchInfo[];
   workspaces: WorkspaceInfo[];
@@ -119,7 +135,6 @@ export type AppModalsProps = {
   SettingsViewComponent: ComponentType<SettingsViewProps>;
   settingsProps: Omit<SettingsViewProps, "initialSection" | "onClose">;
 };
-
 export const AppModals = memo(function AppModals({
   renamePrompt,
   onRenamePromptChange,
@@ -160,6 +175,10 @@ export const AppModals = memo(function AppModals({
   onMobileRemoteWorkspacePathPromptRecentPathSelect,
   onMobileRemoteWorkspacePathPromptCancel,
   onMobileRemoteWorkspacePathPromptConfirm,
+  directoryBrowserPrompt,
+  onDirectoryBrowserNavigate,
+  onDirectoryBrowserConfirm,
+  onDirectoryBrowserCancel,
   branchSwitcher,
   branches,
   workspaces,
@@ -278,6 +297,19 @@ export const AppModals = memo(function AppModals({
             onRecentPathSelect={onMobileRemoteWorkspacePathPromptRecentPathSelect}
             onCancel={onMobileRemoteWorkspacePathPromptCancel}
             onConfirm={onMobileRemoteWorkspacePathPromptConfirm}
+          />
+        </Suspense>
+      )}
+      {directoryBrowserPrompt && (
+        <Suspense fallback={null}>
+          <DirectoryBrowserPrompt
+            currentPath={directoryBrowserPrompt.currentPath}
+            entries={directoryBrowserPrompt.entries}
+            isLoading={directoryBrowserPrompt.isLoading}
+            error={directoryBrowserPrompt.error}
+            onNavigate={onDirectoryBrowserNavigate}
+            onConfirm={onDirectoryBrowserConfirm}
+            onCancel={onDirectoryBrowserCancel}
           />
         </Suspense>
       )}

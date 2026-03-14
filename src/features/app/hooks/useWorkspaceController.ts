@@ -9,17 +9,23 @@ type WorkspaceControllerOptions = {
   appSettings: AppSettings;
   addDebugEntry: (entry: DebugEntry) => void;
   queueSaveSettings: (next: AppSettings) => Promise<AppSettings>;
+  suspendInitialRefresh?: boolean;
+  onRemoteSetupRequired?: (message?: string | null) => void;
 };
 
 export function useWorkspaceController({
   appSettings,
   addDebugEntry,
   queueSaveSettings,
+  suspendInitialRefresh = false,
+  onRemoteSetupRequired,
 }: WorkspaceControllerOptions) {
   const workspaceCore = useWorkspaces({
     onDebug: addDebugEntry,
     appSettings,
     onUpdateAppSettings: queueSaveSettings,
+    suspendInitialRefresh,
+    onRemoteSetupRequired,
   });
 
   const {
@@ -37,6 +43,10 @@ export function useWorkspaceController({
     submitMobileRemoteWorkspacePathPrompt,
     appendMobileRemoteWorkspacePathFromRecent,
     rememberRecentMobileRemoteWorkspacePaths,
+    directoryBrowserPrompt,
+    onDirectoryBrowserNavigate,
+    onDirectoryBrowserConfirm,
+    onDirectoryBrowserCancel,
     showAddWorkspacesResult,
     confirmWorkspaceRemoval,
     confirmWorktreeRemoval,
@@ -121,6 +131,10 @@ export function useWorkspaceController({
     cancelMobileRemoteWorkspacePathPrompt,
     submitMobileRemoteWorkspacePathPrompt,
     appendMobileRemoteWorkspacePathFromRecent,
+    directoryBrowserPrompt,
+    onDirectoryBrowserNavigate,
+    onDirectoryBrowserConfirm,
+    onDirectoryBrowserCancel,
     removeWorkspace,
     removeWorktree,
   };

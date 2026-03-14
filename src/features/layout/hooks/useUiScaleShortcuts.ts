@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { isTauri } from "@tauri-apps/api/core";
 import type { AppSettings } from "../../../types";
 import { clampUiScale, UI_SCALE_STEP } from "../../../utils/uiScale";
 import { isMacPlatform } from "../../../utils/shortcuts";
@@ -26,7 +27,7 @@ export function useUiScaleShortcuts({
   const uiScale = clampUiScale(settings.uiScale);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (typeof window === "undefined" || !isTauri()) {
       return;
     }
     getCurrentWebview()

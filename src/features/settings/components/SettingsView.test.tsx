@@ -785,49 +785,60 @@ describe("SettingsView Codex section", () => {
 
   it("renders mobile daemon controls in local backend mode for TCP provider", async () => {
     cleanup();
-    render(
-      <SettingsView
-        workspaceGroups={[]}
-        groupedWorkspaces={[]}
-        ungroupedLabel="Ungrouped"
-        onClose={vi.fn()}
-        onMoveWorkspace={vi.fn()}
-        onDeleteWorkspace={vi.fn()}
-        onCreateWorkspaceGroup={vi.fn().mockResolvedValue(null)}
-        onRenameWorkspaceGroup={vi.fn().mockResolvedValue(null)}
-        onMoveWorkspaceGroup={vi.fn().mockResolvedValue(null)}
-        onDeleteWorkspaceGroup={vi.fn().mockResolvedValue(null)}
-        onAssignWorkspaceGroup={vi.fn().mockResolvedValue(null)}
-        reduceTransparency={false}
-        onToggleTransparency={vi.fn()}
-        appSettings={{
-          ...baseSettings,
-          backendMode: "local",
-          remoteBackendProvider: "tcp",
-        }}
-        openAppIconById={{}}
-        onUpdateAppSettings={vi.fn().mockResolvedValue(undefined)}
-        onRunDoctor={vi.fn().mockResolvedValue(createDoctorResult())}
-        onUpdateWorkspaceSettings={vi.fn().mockResolvedValue(undefined)}
-        scaleShortcutTitle="Scale shortcut"
-        scaleShortcutText="Use Command +/-"
-        onTestNotificationSound={vi.fn()}
-        onTestSystemNotification={vi.fn()}
-        dictationModelStatus={null}
-        onDownloadDictationModel={vi.fn()}
-        onCancelDictationDownload={vi.fn()}
-        onRemoveDictationModel={vi.fn()}
-        initialSection="server"
-      />,
-    );
+    const globalScope = globalThis as typeof globalThis & { isTauri?: boolean };
+    const originalIsTauri = globalScope.isTauri;
+    globalScope.isTauri = true;
+    try {
+      render(
+        <SettingsView
+          workspaceGroups={[]}
+          groupedWorkspaces={[]}
+          ungroupedLabel="Ungrouped"
+          onClose={vi.fn()}
+          onMoveWorkspace={vi.fn()}
+          onDeleteWorkspace={vi.fn()}
+          onCreateWorkspaceGroup={vi.fn().mockResolvedValue(null)}
+          onRenameWorkspaceGroup={vi.fn().mockResolvedValue(null)}
+          onMoveWorkspaceGroup={vi.fn().mockResolvedValue(null)}
+          onDeleteWorkspaceGroup={vi.fn().mockResolvedValue(null)}
+          onAssignWorkspaceGroup={vi.fn().mockResolvedValue(null)}
+          reduceTransparency={false}
+          onToggleTransparency={vi.fn()}
+          appSettings={{
+            ...baseSettings,
+            backendMode: "local",
+            remoteBackendProvider: "tcp",
+          }}
+          openAppIconById={{}}
+          onUpdateAppSettings={vi.fn().mockResolvedValue(undefined)}
+          onRunDoctor={vi.fn().mockResolvedValue(createDoctorResult())}
+          onUpdateWorkspaceSettings={vi.fn().mockResolvedValue(undefined)}
+          scaleShortcutTitle="Scale shortcut"
+          scaleShortcutText="Use Command +/-"
+          onTestNotificationSound={vi.fn()}
+          onTestSystemNotification={vi.fn()}
+          dictationModelStatus={null}
+          onDownloadDictationModel={vi.fn()}
+          onCancelDictationDownload={vi.fn()}
+          onRemoveDictationModel={vi.fn()}
+          initialSection="server"
+        />,
+      );
 
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Start daemon" })).toBeTruthy();
-      expect(screen.getByRole("button", { name: "Stop daemon" })).toBeTruthy();
-      expect(screen.getByRole("button", { name: "Refresh status" })).toBeTruthy();
-      expect(screen.getByLabelText("Remote backend host")).toBeTruthy();
-      expect(screen.getByLabelText("Remote backend token")).toBeTruthy();
-    });
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Start daemon" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Stop daemon" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Refresh status" })).toBeTruthy();
+        expect(screen.getByLabelText("Remote endpoint")).toBeTruthy();
+        expect(screen.getByLabelText("Remote token")).toBeTruthy();
+      });
+    } finally {
+      if (typeof originalIsTauri === "undefined") {
+        Reflect.deleteProperty(globalScope, "isTauri");
+      } else {
+        globalScope.isTauri = originalIsTauri;
+      }
+    }
   });
 
   it("shows mobile-only server controls on iOS runtime", async () => {
@@ -897,8 +908,8 @@ describe("SettingsView Codex section", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Remote backend host")).toBeTruthy();
-        expect(screen.getByLabelText("Remote backend token")).toBeTruthy();
+        expect(screen.getByLabelText("Remote endpoint")).toBeTruthy();
+        expect(screen.getByLabelText("Remote token")).toBeTruthy();
         expect(screen.getByRole("button", { name: "Connect & test" })).toBeTruthy();
       });
 
@@ -907,7 +918,7 @@ describe("SettingsView Codex section", () => {
       expect(screen.queryByRole("button", { name: "Detect Tailscale" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Start Runner" })).toBeNull();
       expect(
-        screen.getByText(/get the tailscale hostname and token from your desktop/i),
+        screen.getByText(/does not provide hosted backend services/i),
       ).toBeTruthy();
     } finally {
       if (originalPlatformDescriptor) {
@@ -1060,7 +1071,7 @@ describe("SettingsView Codex section", () => {
       fireEvent.change(screen.getByLabelText("New remote name"), {
         target: { value: "Travel Mac" },
       });
-      fireEvent.change(screen.getByLabelText("New remote host"), {
+      fireEvent.change(screen.getByLabelText("New remote endpoint"), {
         target: { value: "travel-mac.tailnet.ts.net:4732" },
       });
       fireEvent.change(screen.getByLabelText("New remote token"), {

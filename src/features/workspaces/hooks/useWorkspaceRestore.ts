@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { WorkspaceInfo } from "../../../types";
 
-const INITIAL_THREAD_LIST_MAX_PAGES = 6;
+const INITIAL_THREAD_LIST_MAX_PAGES = 1;
 
 type WorkspaceRestoreOptions = {
   workspaces: WorkspaceInfo[];
@@ -9,7 +9,7 @@ type WorkspaceRestoreOptions = {
   connectWorkspace: (workspace: WorkspaceInfo) => Promise<void>;
   listThreadsForWorkspaces: (
     workspaces: WorkspaceInfo[],
-    options?: { preserveState?: boolean; maxPages?: number },
+    options?: { preserveState?: boolean; maxPages?: number; allWorkspaces?: WorkspaceInfo[] },
   ) => Promise<void>;
 };
 
@@ -50,6 +50,7 @@ export function useWorkspaceRestore({
       if (connectedTargets.length > 0) {
         await listThreadsForWorkspaces(connectedTargets, {
           maxPages: INITIAL_THREAD_LIST_MAX_PAGES,
+          allWorkspaces: workspaces,
         });
       }
     })();

@@ -13,6 +13,7 @@ export type MobileServerSetupWizardProps = {
   onRemoteHostChange: (value: string) => void;
   onRemoteTokenChange: (value: string) => void;
   onConnectTest: () => void;
+  submitLabel?: string;
 };
 
 export function MobileServerSetupWizard({
@@ -26,40 +27,41 @@ export function MobileServerSetupWizard({
   onRemoteHostChange,
   onRemoteTokenChange,
   onConnectTest,
+  submitLabel = "Connect & test",
 }: MobileServerSetupWizardProps) {
   return (
     <ModalShell
       className="mobile-setup-wizard-overlay"
       cardClassName="mobile-setup-wizard-card"
       onBackdropClick={onClose}
-      ariaLabel="Mobile server setup"
+      ariaLabel="Remote server setup"
     >
       <div className="mobile-setup-wizard-header">
         <button
           type="button"
           className="ghost icon-button mobile-setup-wizard-close"
           onClick={onClose}
-          aria-label="Close mobile setup"
+          aria-label="Close remote setup"
         >
           <X aria-hidden />
         </button>
-        <div className="mobile-setup-wizard-kicker">Mobile Setup Required</div>
-        <h2 className="mobile-setup-wizard-title">Connect to your desktop backend</h2>
+        <div className="mobile-setup-wizard-kicker">Remote Setup Required</div>
+        <h2 className="mobile-setup-wizard-title">Connect to your backend service</h2>
         <p className="mobile-setup-wizard-subtitle">
-          Complete this setup before using the app. Use the same connection details configured on
-          your desktop CodexMonitor server settings.
+          Complete this setup before using the app. Use the same endpoint and optional token
+          configured for your remote CodexMonitor server.
         </p>
       </div>
 
       <div className="mobile-setup-wizard-body">
         <label className="mobile-setup-wizard-label" htmlFor="mobile-setup-host">
-          Tailscale host
+          Remote server / Endpoint
         </label>
         <input
           id="mobile-setup-host"
           className="mobile-setup-wizard-input"
           value={remoteHostDraft}
-          placeholder="macbook.your-tailnet.ts.net:4732"
+          placeholder="server.example.com:4732 or https://codex.example.com"
           onChange={(event) => onRemoteHostChange(event.target.value)}
           disabled={busy || checking}
         />
@@ -83,7 +85,7 @@ export function MobileServerSetupWizard({
           onClick={onConnectTest}
           disabled={busy || checking}
         >
-          {checking ? "Checking..." : busy ? "Connecting..." : "Connect & test"}
+          {checking ? "Checking..." : busy ? "Saving..." : submitLabel}
         </button>
 
         {statusMessage ? (
@@ -99,7 +101,8 @@ export function MobileServerSetupWizard({
         ) : null}
 
         <div className="mobile-setup-wizard-hint">
-          Use the Tailscale host from desktop Server settings and keep the desktop daemon running.
+          Use the endpoint from your remote server configuration. You can also update advanced
+          remote settings later from Settings → Server.
         </div>
       </div>
     </ModalShell>

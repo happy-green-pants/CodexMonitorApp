@@ -121,6 +121,38 @@ describe("useAppSettings", () => {
     expect(result.current.settings.uiScale).toBe(2.4);
   });
 
+  it("preserves http remote providers when loading saved settings", async () => {
+    getAppSettingsMock.mockResolvedValue(
+      ({
+        backendMode: "remote",
+        remoteBackendProvider: "http",
+        remoteBackendHost: "https://codex.example.com",
+        remoteBackendToken: "token-1",
+        remoteBackends: [
+          {
+            id: "remote-web",
+            name: "Web remote",
+            provider: "http",
+            host: "https://codex.example.com",
+            token: "token-1",
+          },
+        ],
+        activeRemoteBackendId: "remote-web",
+      } as unknown) as AppSettings,
+    );
+
+    const { result } = renderHook(() => useAppSettings());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.settings.remoteBackendProvider).toBe("http");
+    expect(result.current.settings.remoteBackendHost).toBe("https://codex.example.com");
+    expect(result.current.settings.remoteBackends[0]).toMatchObject({
+      provider: "http",
+      host: "https://codex.example.com",
+    });
+  });
+
   it("surfaces doctor errors", async () => {
     getAppSettingsMock.mockResolvedValue({} as AppSettings);
     runCodexDoctorMock.mockRejectedValue(new Error("doctor fail"));

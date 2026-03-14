@@ -25,6 +25,8 @@ export type UseWorkspacesOptions = {
   onDebug?: (entry: DebugEntry) => void;
   appSettings?: AppSettings;
   onUpdateAppSettings?: (next: AppSettings) => Promise<AppSettings>;
+  suspendInitialRefresh?: boolean;
+  onRemoteSetupRequired?: (message?: string | null) => void;
 };
 
 export type UseWorkspacesResult = {
@@ -77,7 +79,13 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}): UseWorkspaces
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
   const workspaceSettingsRef = useRef<Map<string, WorkspaceSettings>>(new Map());
-  const { onDebug, appSettings, onUpdateAppSettings } = options;
+  const {
+    onDebug,
+    appSettings,
+    onUpdateAppSettings,
+    suspendInitialRefresh = false,
+    onRemoteSetupRequired,
+  } = options;
 
   const {
     addWorkspaceFromPath,
@@ -96,11 +104,15 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}): UseWorkspaces
     setActiveWorkspaceId,
     workspaceSettingsRef,
     setHasLoaded,
+    onRemoteSetupRequired,
   });
 
   useEffect(() => {
+    if (suspendInitialRefresh) {
+      return;
+    }
     void refreshWorkspaces();
-  }, [refreshWorkspaces]);
+  }, [refreshWorkspaces, suspendInitialRefresh]);
 
   useEffect(() => {
     const next = new Map<string, WorkspaceSettings>();

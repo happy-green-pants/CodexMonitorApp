@@ -27,6 +27,8 @@ type UseWorkspaceInsightsOrchestrationOptions = {
   threadStatusById: Record<string, ThreadStatus | undefined>;
   threadListLoadingByWorkspace: Record<string, boolean | undefined>;
   getWorkspaceGroupName: (workspaceId: string) => string | null | undefined;
+  suspendRemoteLoading?: boolean;
+  onRemoteSetupRequired?: (message?: string | null) => void;
 };
 
 type UseWorkspaceOrderingOrchestrationOptions = {
@@ -48,6 +50,8 @@ export function useWorkspaceInsightsOrchestration({
   threadStatusById,
   threadListLoadingByWorkspace,
   getWorkspaceGroupName,
+  suspendRemoteLoading = false,
+  onRemoteSetupRequired,
 }: UseWorkspaceInsightsOrchestrationOptions) {
   const latestAgentRuns = useMemo(() => {
     const entries: Array<{
@@ -129,7 +133,9 @@ export function useWorkspaceInsightsOrchestration({
     isLoading: isLoadingLocalUsage,
     error: localUsageError,
     refresh: refreshLocalUsage,
-  } = useLocalUsage(showHome, usageWorkspacePath);
+  } = useLocalUsage(showHome && !suspendRemoteLoading, usageWorkspacePath, {
+    onRemoteSetupRequired,
+  });
 
   return {
     latestAgentRuns,

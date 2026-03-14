@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isRemoteSetupRequiredError } from "../../../services/browserRemote";
 import type { LocalUsageSnapshot } from "../../../types";
 import { localUsageSnapshot } from "../../../services/tauri";
 
@@ -16,11 +17,16 @@ const emptyState: LocalUsageState = {
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
-export function useLocalUsage(enabled: boolean, workspacePath: string | null) {
+export function useLocalUsage(
+  enabled: boolean,
+  workspacePath: string | null,
+  options?: { onRemoteSetupRequired?: (message?: string | null) => void },
+) {
   const [state, setState] = useState<LocalUsageState>(emptyState);
   const requestIdRef = useRef(0);
   const enabledRef = useRef(enabled);
   const workspaceRef = useRef(workspacePath);
+  const onRemoteSetupRequiredRef = useRef(options?.onRemoteSetupRequired);
 
   useEffect(() => {
     enabledRef.current = enabled;
@@ -32,6 +38,10 @@ export function useLocalUsage(enabled: boolean, workspacePath: string | null) {
   useEffect(() => {
     workspaceRef.current = workspacePath;
   }, [workspacePath]);
+
+  useEffect(() => {
+    onRemoteSetupRequiredRef.current = options?.onRemoteSetupRequired;
+  }, [options?.onRemoteSetupRequired]);
 
   const refresh = useCallback(() => {
     if (!enabledRef.current) {
@@ -52,6 +62,9 @@ export function useLocalUsage(enabled: boolean, workspacePath: string | null) {
           return;
         }
         const message = err instanceof Error ? err.message : String(err);
+        if (isRemoteSetupRequiredError(err)) {
+          onRemoteSetupRequiredRef.current?.(message);
+        }
         setState((prev) => ({ ...prev, isLoading: false, error: message }));
       });
   }, []);

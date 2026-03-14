@@ -1,14 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import * as notification from "@tauri-apps/plugin-notification";
 import {
+  browserRemoteInvoke,
+  loadBrowserRemoteSettings,
+  saveBrowserRemoteSettings,
+} from "./browserRemote";
+import {
   exportMarkdownFile,
   addWorkspace,
+  addWorkspaceFromGitUrl,
   compactThread,
   createGitHubRepo,
   fetchGit,
   forkThread,
+  getAppSettings,
   getAppsList,
   getAgentsSettings,
   getExperimentalFeatureList,
@@ -41,6 +48,7 @@ import {
   tailscaleDaemonStop,
   tailscaleStatus,
   pickWorkspacePaths,
+  updateAppSettings,
   writeGlobalAgentsMd,
   writeGlobalCodexConfigToml,
   createAgent,
@@ -55,6 +63,7 @@ import {
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
+  isTauri: vi.fn(() => true),
 }));
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
@@ -66,6 +75,13 @@ vi.mock("@tauri-apps/plugin-notification", () => ({
   isPermissionGranted: vi.fn(),
   requestPermission: vi.fn(),
   sendNotification: vi.fn(),
+}));
+
+vi.mock("./browserRemote", () => ({
+  browserRemoteInvoke: vi.fn(),
+  loadBrowserRemoteSettings: vi.fn(),
+  saveBrowserRemoteSettings: vi.fn(),
+  shouldUseBrowserRemoteTransport: vi.fn(() => false),
 }));
 
 describe("tauri invoke wrappers", () => {
@@ -84,6 +100,15 @@ describe("tauri invoke wrappers", () => {
       }
       return undefined;
     });
+    vi.mocked(isTauri).mockReturnValue(true);
+    vi.mocked(loadBrowserRemoteSettings).mockReturnValue({
+      backendMode: "remote",
+      remoteBackendProvider: "http",
+      remoteBackendHost: "https://monitor.example.com",
+      remoteBackendToken: "token-1",
+      remoteBackends: [],
+      activeRemoteBackendId: "remote-default",
+    });
   });
 
   it("uses path-only payload for addWorkspace", async () => {
@@ -94,6 +119,30 @@ describe("tauri invoke wrappers", () => {
 
     expect(invokeMock).toHaveBeenCalledWith("add_workspace", {
       path: "/tmp/project",
+    });
+  });
+
+  it("maps payload for addWorkspaceFromGitUrl", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({ id: "ws-1" });
+    invokeMock.mockResolvedValueOnce({ id: "ws-2" });
+
+    await addWorkspaceFromGitUrl(
+      "https://github.com/org/repo.git",
+      "/tmp/workspaces",
+      "repo",
+    );
+    await addWorkspaceFromGitUrl("https://github.com/org/repo2.git", "/tmp/workspaces");
+
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "add_workspace_from_git_url", {
+      url: "https://github.com/org/repo.git",
+      destinationPath: "/tmp/workspaces",
+      targetFolderName: "repo",
+    });
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "add_workspace_from_git_url", {
+      url: "https://github.com/org/repo2.git",
+      destinationPath: "/tmp/workspaces",
+      targetFolderName: null,
     });
   });
 
@@ -199,6 +248,63 @@ describe("tauri invoke wrappers", () => {
 
     await expect(listWorkspaces()).resolves.toEqual([]);
     expect(invokeMock).toHaveBeenCalledWith("list_workspaces");
+  });
+
+  it("loads app settings from browser storage outside Tauri", async () => {
+    vi.mocked(isTauri).mockReturnValue(false);
+    vi.mocked(loadBrowserRemoteSettings).mockReturnValue({
+      backendMode: "remote",
+      remoteBackendProvider: "http",
+      remoteBackendHost: "https://codex.example.com",
+      remoteBackendToken: "token-1",
+      remoteBackends: [],
+      activeRemoteBackendId: "remote-default",
+    });
+
+    await expect(getAppSettings()).resolves.toMatchObject({
+      remoteBackendProvider: "http",
+      remoteBackendHost: "https://codex.example.com",
+    });
+  });
+
+  it("uses browser rpc for workspace listing outside Tauri", async () => {
+    vi.mocked(isTauri).mockReturnValue(false);
+    vi.mocked(browserRemoteInvoke).mockResolvedValueOnce([{ id: "ws-browser" }]);
+
+    await expect(listWorkspaces()).resolves.toEqual([{ id: "ws-browser" }]);
+    expect(browserRemoteInvoke).toHaveBeenCalledWith("list_workspaces", {});
+  });
+
+  it("persists browser app settings outside Tauri", async () => {
+    vi.mocked(isTauri).mockReturnValue(false);
+    vi.mocked(saveBrowserRemoteSettings).mockReturnValue({
+      backendMode: "remote",
+      remoteBackendProvider: "http",
+      remoteBackendHost: "https://codex.example.com",
+      remoteBackendToken: "token-2",
+      remoteBackends: [],
+      activeRemoteBackendId: "remote-default",
+    });
+
+    await expect(
+      updateAppSettings({
+        backendMode: "remote",
+        remoteBackendProvider: "http",
+        remoteBackendHost: "https://codex.example.com",
+        remoteBackendToken: "token-2",
+      } as any),
+    ).resolves.toMatchObject({
+      remoteBackendProvider: "http",
+      remoteBackendToken: "token-2",
+    });
+
+    expect(saveBrowserRemoteSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        remoteBackendProvider: "http",
+        remoteBackendHost: "https://codex.example.com",
+        remoteBackendToken: "token-2",
+      }),
+    );
   });
 
   it("applies default limit for git log", async () => {

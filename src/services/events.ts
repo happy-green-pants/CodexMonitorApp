@@ -1,4 +1,9 @@
+import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import {
+  getBrowserRemoteWebSocketUrl,
+  loadBrowserRemoteSettings,
+} from "./browserRemote";
 import type {
   AppServerEvent,
   DictationEvent,
@@ -25,6 +30,148 @@ type SubscriptionOptions = {
 
 type Listener<T> = (payload: T) => void;
 
+const BROWSER_REMOTE_EVENT_NAMES = new Set([
+  "app-server-event",
+  "terminal-output",
+  "terminal-exit",
+]);
+const BROWSER_WS_AUTH_REQUEST_ID = 1;
+
+type BrowserEventEnvelope<T> = {
+  id?: number;
+  method?: string;
+  params?: T;
+  result?: unknown;
+  error?: { message?: string };
+};
+
+function parseBrowserEventEnvelope<T>(value: unknown): BrowserEventEnvelope<T> | null {
+  const text =
+    typeof value === "string"
+      ? value
+      : value instanceof ArrayBuffer
+        ? new TextDecoder().decode(value)
+        : null;
+  if (!text) {
+    return null;
+  }
+  try {
+    return JSON.parse(text) as BrowserEventEnvelope<T>;
+  } catch {
+    return null;
+  }
+}
+
+function createBrowserEventSubscription<T>(
+  eventName: string,
+  onEvent: Listener<T>,
+  options?: SubscriptionOptions,
+): Promise<Unsubscribe> {
+  if (!BROWSER_REMOTE_EVENT_NAMES.has(eventName)) {
+    return Promise.resolve(() => {});
+  }
+  if (typeof WebSocket === "undefined") {
+    return Promise.reject(new Error("WebSocket is unavailable in this browser runtime."));
+  }
+
+  const settings = loadBrowserRemoteSettings();
+  if (settings.backendMode !== "remote" || settings.remoteBackendProvider !== "http") {
+    return Promise.reject(
+      new Error("Browser events require the remote HTTP provider to be configured."),
+    );
+  }
+
+  return new Promise<Unsubscribe>((resolve, reject) => {
+    const socket = new WebSocket(getBrowserRemoteWebSocketUrl(settings));
+    const token = settings.remoteBackendToken?.trim() || null;
+    let settled = false;
+    let authenticated = token == null;
+    let closedByClient = false;
+
+    const cleanup = () => {
+      closedByClient = true;
+      try {
+        socket.close();
+      } catch {
+        // Ignore duplicate close attempts during teardown.
+      }
+    };
+
+    const rejectOrNotify = (error: Error) => {
+      if (!settled) {
+        settled = true;
+        reject(error);
+        return;
+      }
+      if (!closedByClient) {
+        options?.onError?.(error);
+      }
+    };
+
+    socket.onopen = () => {
+      if (!token) {
+        settled = true;
+        resolve(cleanup);
+        return;
+      }
+
+      socket.send(
+        JSON.stringify({
+          id: BROWSER_WS_AUTH_REQUEST_ID,
+          method: "auth",
+          params: { token },
+        }),
+      );
+    };
+
+    socket.onmessage = (event) => {
+      const payload = parseBrowserEventEnvelope<T>(event.data);
+      if (!payload) {
+        return;
+      }
+
+      if (!authenticated) {
+        if (payload.error) {
+          rejectOrNotify(
+            new Error(payload.error.message || "Failed to authenticate remote event stream."),
+          );
+          cleanup();
+          return;
+        }
+        if (payload.id === BROWSER_WS_AUTH_REQUEST_ID && payload.result !== undefined) {
+          authenticated = true;
+          if (!settled) {
+            settled = true;
+            resolve(cleanup);
+          }
+          return;
+        }
+      }
+
+      if (payload.method === eventName) {
+        onEvent(payload.params as T);
+      }
+    };
+
+    socket.onerror = () => {
+      rejectOrNotify(new Error("Unable to connect to the remote event stream."));
+    };
+
+    socket.onclose = () => {
+      if (closedByClient) {
+        return;
+      }
+      rejectOrNotify(
+        new Error(
+          authenticated
+            ? "Remote event stream disconnected."
+            : "Remote event stream closed before authentication completed.",
+        ),
+      );
+    };
+  });
+}
+
 function createEventHub<T>(eventName: string) {
   const listeners = new Set<Listener<T>>();
   let unlisten: Unsubscribe | null = null;
@@ -34,15 +181,29 @@ function createEventHub<T>(eventName: string) {
     if (unlisten || listenPromise) {
       return;
     }
-    listenPromise = listen<T>(eventName, (event) => {
-      for (const listener of listeners) {
-        try {
-          listener(event.payload);
-        } catch (error) {
-          console.error(`[events] ${eventName} listener failed`, error);
-        }
-      }
-    });
+    listenPromise = isTauri()
+      ? listen<T>(eventName, (event) => {
+          for (const listener of listeners) {
+            try {
+              listener(event.payload);
+            } catch (error) {
+              console.error(`[events] ${eventName} listener failed`, error);
+            }
+          }
+        })
+      : createBrowserEventSubscription<T>(
+          eventName,
+          (payload) => {
+            for (const listener of listeners) {
+              try {
+                listener(payload);
+              } catch (error) {
+                console.error(`[events] ${eventName} listener failed`, error);
+              }
+            }
+          },
+          options,
+        );
     listenPromise
       .then((handler) => {
         listenPromise = null;

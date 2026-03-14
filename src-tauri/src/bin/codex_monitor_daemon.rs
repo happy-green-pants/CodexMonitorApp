@@ -15,6 +15,8 @@ mod file_ops;
 mod file_policy;
 #[path = "../git_utils.rs"]
 mod git_utils;
+#[path = "codex_monitor_daemon/http.rs"]
+mod http;
 #[path = "codex_monitor_daemon/rpc.rs"]
 mod rpc;
 #[path = "../rules.rs"]
@@ -32,6 +34,8 @@ mod types;
 mod utils;
 #[path = "../workspaces/macos.rs"]
 mod workspace_macos;
+#[path = "../workspaces/git.rs"]
+mod workspace_git;
 #[path = "../workspaces/settings.rs"]
 mod workspace_settings;
 
@@ -77,6 +81,10 @@ use tokio::sync::{broadcast, mpsc, Mutex, Semaphore};
 
 use backend::app_server::{spawn_workspace_session, WorkspaceSession};
 use backend::events::{AppServerEvent, EventSink, TerminalExit, TerminalOutput};
+use workspace_git::{
+    git_branch_exists, git_find_remote_for_branch, git_remote_branch_exists, git_remote_exists,
+    is_missing_worktree_error, run_git_command_owned, unique_branch_name,
+};
 use shared::codex_core::CodexLoginCancelState;
 use shared::process_core::kill_child_process_tree;
 use shared::prompts_core::{self, CustomPromptEntry};
@@ -91,6 +99,7 @@ use types::{
     WorkspaceEntry, WorkspaceInfo, WorkspaceSettings, WorktreeSetupStatus,
 };
 use workspace_settings::apply_workspace_settings_update;
+use crate::git_utils::resolve_git_root;
 
 const DEFAULT_LISTEN_ADDR: &str = "127.0.0.1:4732";
 const MAX_IN_FLIGHT_RPC_PER_CONNECTION: usize = 32;
@@ -144,6 +153,7 @@ impl EventSink for DaemonEventSink {
 
 struct DaemonConfig {
     listen: SocketAddr,
+    http_listen: Option<SocketAddr>,
     token: Option<String>,
     data_dir: PathBuf,
 }
@@ -164,6 +174,22 @@ struct DaemonState {
 struct WorkspaceFileResponse {
     content: String,
     truncated: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DirectoryEntryResponse {
+    name: String,
+    path: String,
+    is_dir: bool,
+    is_symlink: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DirectoryListingResponse {
+    current_path: String,
+    entries: Vec<DirectoryEntryResponse>,
 }
 
 impl DaemonState {
@@ -247,282 +273,67 @@ impl DaemonState {
         workspaces_core::is_workspace_path_dir_core(&path)
     }
 
-    async fn add_workspace(
+    async fn list_directory_entries(
         &self,
-        path: String,
-        client_version: String,
-    ) -> Result<WorkspaceInfo, String> {
-        let client_version = client_version.clone();
-        workspaces_core::add_workspace_core(
-            path,
-            &self.workspaces,
-            &self.sessions,
-            &self.app_settings,
-            &self.storage_path,
-            move |entry, default_bin, codex_args, codex_home| {
-                spawn_with_client(
-                    self.event_sink.clone(),
-                    client_version.clone(),
-                    entry,
-                    default_bin,
-                    codex_args,
-                    codex_home,
-                )
-            },
-        )
-        .await
-    }
+        path: Option<String>,
+        limit: Option<u32>,
+        show_hidden: bool,
+    ) -> Result<DirectoryListingResponse, String> {
+        let resolved = path.unwrap_or_else(|| "/".to_string());
+        let trimmed = resolved.trim();
+        if trimmed.is_empty() {
+            return Err("missing directory path".to_string());
+        }
+        if trimmed.contains('~') || trimmed.contains('$') || trimmed.contains('%') {
+            return Err("directory path must be absolute and not include ~ or env vars".to_string());
+        }
+        let base = PathBuf::from(trimmed);
+        if !base.is_absolute() {
+            return Err("directory path must be absolute".to_string());
+        }
+        let metadata = std::fs::metadata(&base)
+            .map_err(|err| format!("Failed to read directory metadata: {err}"))?;
+        if !metadata.is_dir() {
+            return Err("path is not a directory".to_string());
+        }
 
-    async fn add_workspace_from_git_url(
-        &self,
-        url: String,
-        destination_path: String,
-        target_folder_name: Option<String>,
-        client_version: String,
-    ) -> Result<WorkspaceInfo, String> {
-        let client_version = client_version.clone();
-        workspaces_core::add_workspace_from_git_url_core(
-            url,
-            destination_path,
-            target_folder_name,
-            &self.workspaces,
-            &self.sessions,
-            &self.app_settings,
-            &self.storage_path,
-            move |entry, default_bin, codex_args, codex_home| {
-                spawn_with_client(
-                    self.event_sink.clone(),
-                    client_version.clone(),
-                    entry,
-                    default_bin,
-                    codex_args,
-                    codex_home,
-                )
-            },
-        )
-        .await
-    }
+        let mut entries = Vec::new();
+        let limit = limit.unwrap_or(200).min(1000) as usize;
+        for entry in std::fs::read_dir(&base)
+            .map_err(|err| format!("Failed to list directory entries: {err}"))?
+        {
+            let entry = entry.map_err(|err| format!("Failed to read directory entry: {err}"))?;
+            let file_name = entry.file_name();
+            let name = file_name.to_string_lossy().to_string();
+            if name.is_empty() {
+                continue;
+            }
+            if !show_hidden && name.starts_with('.') {
+                continue;
+            }
+            let entry_type = entry
+                .file_type()
+                .map_err(|err| format!("Failed to read directory entry type: {err}"))?;
+            if !entry_type.is_dir() {
+                continue;
+            }
+            let path = entry.path();
+            entries.push(DirectoryEntryResponse {
+                name,
+                path: path.to_string_lossy().to_string(),
+                is_dir: true,
+                is_symlink: entry_type.is_symlink(),
+            });
+            if entries.len() >= limit {
+                break;
+            }
+        }
 
-    async fn add_worktree(
-        &self,
-        parent_id: String,
-        branch: String,
-        name: Option<String>,
-        copy_agents_md: bool,
-        client_version: String,
-    ) -> Result<WorkspaceInfo, String> {
-        let client_version = client_version.clone();
-        workspaces_core::add_worktree_core(
-            parent_id,
-            branch,
-            name,
-            copy_agents_md,
-            &self.data_dir,
-            &self.workspaces,
-            &self.sessions,
-            &self.app_settings,
-            &self.storage_path,
-            |value| worktree_core::sanitize_worktree_name(value),
-            |root, name| worktree_core::unique_worktree_path_strict(root, name),
-            |root, branch_name| {
-                let root = root.clone();
-                let branch_name = branch_name.to_string();
-                async move { git_core::git_branch_exists(&root, &branch_name).await }
-            },
-            Some(|root: &PathBuf, branch_name: &str| {
-                let root = root.clone();
-                let branch_name = branch_name.to_string();
-                async move { git_core::git_find_remote_tracking_branch_local(&root, &branch_name).await }
-            }),
-            |root, args| {
-                workspaces_core::run_git_command_unit(root, args, git_core::run_git_command_owned)
-            },
-            move |entry, default_bin, codex_args, codex_home| {
-                spawn_with_client(
-                    self.event_sink.clone(),
-                    client_version.clone(),
-                    entry,
-                    default_bin,
-                    codex_args,
-                    codex_home,
-                )
-            },
-        )
-        .await
-    }
-
-    async fn worktree_setup_status(
-        &self,
-        workspace_id: String,
-    ) -> Result<WorktreeSetupStatus, String> {
-        workspaces_core::worktree_setup_status_core(&self.workspaces, &workspace_id, &self.data_dir)
-            .await
-    }
-
-    async fn worktree_setup_mark_ran(&self, workspace_id: String) -> Result<(), String> {
-        workspaces_core::worktree_setup_mark_ran_core(
-            &self.workspaces,
-            &workspace_id,
-            &self.data_dir,
-        )
-        .await
-    }
-
-    async fn remove_workspace(&self, id: String) -> Result<(), String> {
-        workspaces_core::remove_workspace_core(
-            id,
-            &self.workspaces,
-            &self.sessions,
-            &self.storage_path,
-            |root, args| {
-                workspaces_core::run_git_command_unit(root, args, git_core::run_git_command_owned)
-            },
-            |error| git_core::is_missing_worktree_error(error),
-            |path| {
-                std::fs::remove_dir_all(path)
-                    .map_err(|err| format!("Failed to remove worktree folder: {err}"))
-            },
-            true,
-            true,
-        )
-        .await
-    }
-
-    async fn remove_worktree(&self, id: String) -> Result<(), String> {
-        workspaces_core::remove_worktree_core(
-            id,
-            &self.workspaces,
-            &self.sessions,
-            &self.storage_path,
-            |root, args| {
-                workspaces_core::run_git_command_unit(root, args, git_core::run_git_command_owned)
-            },
-            |error| git_core::is_missing_worktree_error(error),
-            |path| {
-                std::fs::remove_dir_all(path)
-                    .map_err(|err| format!("Failed to remove worktree folder: {err}"))
-            },
-        )
-        .await
-    }
-
-    async fn rename_worktree(
-        &self,
-        id: String,
-        branch: String,
-        client_version: String,
-    ) -> Result<WorkspaceInfo, String> {
-        let client_version = client_version.clone();
-        workspaces_core::rename_worktree_core(
-            id,
-            branch,
-            &self.data_dir,
-            &self.workspaces,
-            &self.sessions,
-            &self.app_settings,
-            &self.storage_path,
-            |entry| Ok(PathBuf::from(entry.path.clone())),
-            |root, name| {
-                let root = root.clone();
-                let name = name.to_string();
-                async move {
-                    git_core::unique_branch_name_live(&root, &name, None)
-                        .await
-                        .map(|(branch_name, _was_suffixed)| branch_name)
-                }
-            },
-            |value| worktree_core::sanitize_worktree_name(value),
-            |root, name, current| {
-                worktree_core::unique_worktree_path_for_rename(root, name, current)
-            },
-            |root, args| {
-                workspaces_core::run_git_command_unit(root, args, git_core::run_git_command_owned)
-            },
-            move |entry, default_bin, codex_args, codex_home| {
-                spawn_with_client(
-                    self.event_sink.clone(),
-                    client_version.clone(),
-                    entry,
-                    default_bin,
-                    codex_args,
-                    codex_home,
-                )
-            },
-        )
-        .await
-    }
-
-    async fn rename_worktree_upstream(
-        &self,
-        id: String,
-        old_branch: String,
-        new_branch: String,
-    ) -> Result<(), String> {
-        workspaces_core::rename_worktree_upstream_core(
-            id,
-            old_branch,
-            new_branch,
-            &self.workspaces,
-            |entry| Ok(PathBuf::from(entry.path.clone())),
-            |root, branch_name| {
-                let root = root.clone();
-                let branch_name = branch_name.to_string();
-                async move { git_core::git_branch_exists(&root, &branch_name).await }
-            },
-            |root, branch_name| {
-                let root = root.clone();
-                let branch_name = branch_name.to_string();
-                async move { git_core::git_find_remote_for_branch_live(&root, &branch_name).await }
-            },
-            |root, remote| {
-                let root = root.clone();
-                let remote = remote.to_string();
-                async move { git_core::git_remote_exists(&root, &remote).await }
-            },
-            |root, remote, branch_name| {
-                let root = root.clone();
-                let remote = remote.to_string();
-                let branch_name = branch_name.to_string();
-                async move {
-                    git_core::git_remote_branch_exists_live(&root, &remote, &branch_name).await
-                }
-            },
-            |root, args| {
-                workspaces_core::run_git_command_unit(root, args, git_core::run_git_command_owned)
-            },
-        )
-        .await
-    }
-
-    async fn update_workspace_settings(
-        &self,
-        id: String,
-        settings: WorkspaceSettings,
-        client_version: String,
-    ) -> Result<WorkspaceInfo, String> {
-        let client_version = client_version.clone();
-        workspaces_core::update_workspace_settings_core(
-            id,
-            settings,
-            &self.workspaces,
-            &self.sessions,
-            &self.app_settings,
-            &self.storage_path,
-            |workspaces, workspace_id, next_settings| {
-                apply_workspace_settings_update(workspaces, workspace_id, next_settings)
-            },
-            move |entry, default_bin, codex_args, codex_home| {
-                spawn_with_client(
-                    self.event_sink.clone(),
-                    client_version.clone(),
-                    entry,
-                    default_bin,
-                    codex_args,
-                    codex_home,
-                )
-            },
-        )
-        .await
+        entries.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(DirectoryListingResponse {
+            current_path: base.to_string_lossy().to_string(),
+            entries,
+        })
     }
 
     async fn connect_workspace(&self, id: String, client_version: String) -> Result<(), String> {
@@ -551,137 +362,6 @@ impl DaemonState {
             },
         )
         .await
-    }
-
-    async fn set_workspace_runtime_codex_args(
-        &self,
-        workspace_id: String,
-        codex_args: Option<String>,
-        client_version: String,
-    ) -> Result<workspaces_core::WorkspaceRuntimeCodexArgsResult, String> {
-        workspaces_core::set_workspace_runtime_codex_args_core(
-            workspace_id,
-            codex_args,
-            &self.workspaces,
-            &self.sessions,
-            &self.app_settings,
-            move |entry, default_bin, next_args, codex_home| {
-                spawn_with_client(
-                    self.event_sink.clone(),
-                    client_version.clone(),
-                    entry,
-                    default_bin,
-                    next_args,
-                    codex_home,
-                )
-            },
-        )
-        .await
-    }
-
-    async fn get_app_settings(&self) -> AppSettings {
-        settings_core::get_app_settings_core(&self.app_settings).await
-    }
-
-    async fn update_app_settings(&self, settings: AppSettings) -> Result<AppSettings, String> {
-        settings_core::update_app_settings_core(settings, &self.app_settings, &self.settings_path)
-            .await
-    }
-
-    async fn set_codex_feature_flag(
-        &self,
-        feature_key: String,
-        enabled: bool,
-    ) -> Result<(), String> {
-        codex_config::write_feature_enabled(feature_key.as_str(), enabled)
-    }
-
-    async fn get_agents_settings(&self) -> Result<agents_config_core::AgentsSettingsDto, String> {
-        agents_config_core::get_agents_settings_core()
-    }
-
-    async fn set_agents_core_settings(
-        &self,
-        input: agents_config_core::SetAgentsCoreInput,
-    ) -> Result<agents_config_core::AgentsSettingsDto, String> {
-        agents_config_core::set_agents_core_settings_core(input)
-    }
-
-    async fn create_agent(
-        &self,
-        input: agents_config_core::CreateAgentInput,
-    ) -> Result<agents_config_core::AgentsSettingsDto, String> {
-        agents_config_core::create_agent_core(input)
-    }
-
-    async fn update_agent(
-        &self,
-        input: agents_config_core::UpdateAgentInput,
-    ) -> Result<agents_config_core::AgentsSettingsDto, String> {
-        agents_config_core::update_agent_core(input)
-    }
-
-    async fn delete_agent(
-        &self,
-        input: agents_config_core::DeleteAgentInput,
-    ) -> Result<agents_config_core::AgentsSettingsDto, String> {
-        agents_config_core::delete_agent_core(input)
-    }
-
-    async fn read_agent_config_toml(&self, agent_name: String) -> Result<String, String> {
-        agents_config_core::read_agent_config_toml_core(agent_name.as_str())
-    }
-
-    async fn write_agent_config_toml(
-        &self,
-        agent_name: String,
-        content: String,
-    ) -> Result<(), String> {
-        agents_config_core::write_agent_config_toml_core(agent_name.as_str(), content.as_str())
-    }
-
-    async fn list_workspace_files(&self, workspace_id: String) -> Result<Vec<String>, String> {
-        workspaces_core::list_workspace_files_core(&self.workspaces, &workspace_id, |root| {
-            list_workspace_files_inner(root, 20000)
-        })
-        .await
-    }
-
-    async fn read_workspace_file(
-        &self,
-        workspace_id: String,
-        path: String,
-    ) -> Result<WorkspaceFileResponse, String> {
-        workspaces_core::read_workspace_file_core(
-            &self.workspaces,
-            &workspace_id,
-            &path,
-            |root, rel_path| read_workspace_file_inner(root, rel_path),
-        )
-        .await
-    }
-
-    async fn file_read(
-        &self,
-        scope: file_policy::FileScope,
-        kind: file_policy::FileKind,
-        workspace_id: Option<String>,
-    ) -> Result<file_io::TextFileResponse, String> {
-        files_core::file_read_core(&self.workspaces, scope, kind, workspace_id).await
-    }
-
-    async fn file_write(
-        &self,
-        scope: file_policy::FileScope,
-        kind: file_policy::FileKind,
-        workspace_id: Option<String>,
-        content: String,
-    ) -> Result<(), String> {
-        files_core::file_write_core(&self.workspaces, scope, kind, workspace_id, content).await
-    }
-
-    async fn start_thread(&self, workspace_id: String) -> Result<Value, String> {
-        codex_core::start_thread_core(&self.sessions, &self.workspaces, workspace_id).await
     }
 
     async fn resume_thread(
@@ -884,6 +564,134 @@ impl DaemonState {
         codex_core::collaboration_mode_list_core(&self.sessions, workspace_id).await
     }
 
+    async fn start_thread(&self, workspace_id: String) -> Result<Value, String> {
+        codex_core::start_thread_core(&self.sessions, &self.workspaces, workspace_id).await
+    }
+
+    async fn set_codex_feature_flag(
+        &self,
+        feature_key: String,
+        enabled: bool,
+    ) -> Result<Value, String> {
+        codex::config::write_feature_enabled(feature_key.as_str(), enabled)?;
+        Ok(json!({ "ok": true }))
+    }
+
+    async fn get_agents_settings(
+        &self,
+    ) -> Result<agents_config_core::AgentsSettingsDto, String> {
+        agents_config_core::get_agents_settings_core()
+    }
+
+    async fn set_agents_core_settings(
+        &self,
+        input: agents_config_core::SetAgentsCoreInput,
+    ) -> Result<agents_config_core::AgentsSettingsDto, String> {
+        agents_config_core::set_agents_core_settings_core(input)
+    }
+
+    async fn create_agent(
+        &self,
+        input: agents_config_core::CreateAgentInput,
+    ) -> Result<agents_config_core::AgentsSettingsDto, String> {
+        agents_config_core::create_agent_core(input)
+    }
+
+    async fn update_agent(
+        &self,
+        input: agents_config_core::UpdateAgentInput,
+    ) -> Result<agents_config_core::AgentsSettingsDto, String> {
+        agents_config_core::update_agent_core(input)
+    }
+
+    async fn delete_agent(
+        &self,
+        input: agents_config_core::DeleteAgentInput,
+    ) -> Result<agents_config_core::AgentsSettingsDto, String> {
+        agents_config_core::delete_agent_core(input)
+    }
+
+    async fn read_agent_config_toml(&self, agent_name: String) -> Result<String, String> {
+        agents_config_core::read_agent_config_toml_core(agent_name.as_str())
+    }
+
+    async fn write_agent_config_toml(
+        &self,
+        agent_name: String,
+        content: String,
+    ) -> Result<(), String> {
+        agents_config_core::write_agent_config_toml_core(agent_name.as_str(), content.as_str())
+    }
+
+    async fn file_read(
+        &self,
+        scope: files::policy::FileScope,
+        kind: files::policy::FileKind,
+        workspace_id: Option<String>,
+    ) -> Result<files::io::TextFileResponse, String> {
+        files_core::file_read_core(&self.workspaces, scope, kind, workspace_id).await
+    }
+
+    async fn file_write(
+        &self,
+        scope: files::policy::FileScope,
+        kind: files::policy::FileKind,
+        workspace_id: Option<String>,
+        content: String,
+    ) -> Result<(), String> {
+        files_core::file_write_core(&self.workspaces, scope, kind, workspace_id, content).await
+    }
+
+    async fn update_workspace_settings(
+        &self,
+        id: String,
+        settings: WorkspaceSettings,
+        _client_version: String,
+    ) -> Result<WorkspaceInfo, String> {
+        workspaces_core::update_workspace_settings_core(
+            id,
+            settings,
+            &self.workspaces,
+            &self.sessions,
+            &self.app_settings,
+            &self.storage_path,
+            |workspaces, workspace_id, updated_settings| {
+                apply_workspace_settings_update(workspaces, workspace_id, updated_settings)
+            },
+            |_entry, _default_bin, _codex_args, _codex_home| async move {
+                Err("Workspace session spawn is not supported in daemon".to_string())
+            },
+        )
+        .await
+    }
+
+    async fn list_workspace_files(&self, workspace_id: String) -> Result<Vec<String>, String> {
+        workspaces_core::list_workspace_files_core(&self.workspaces, &workspace_id, |root| {
+            list_workspace_files_inner(root, usize::MAX)
+        })
+        .await
+    }
+
+    async fn read_workspace_file(
+        &self,
+        workspace_id: String,
+        path: String,
+    ) -> Result<WorkspaceFileResponse, String> {
+        workspaces_core::read_workspace_file_core(&self.workspaces, &workspace_id, &path, |root, rel| {
+            read_workspace_file_inner(root, rel)
+        })
+        .await
+    }
+
+    async fn get_app_settings(&self) -> AppSettings {
+        settings_core::get_app_settings_core(&self.app_settings).await
+    }
+
+    async fn update_app_settings(&self, settings: AppSettings) -> Result<AppSettings, String> {
+        settings_core::update_app_settings_core(settings, &self.app_settings, &self.settings_path)
+            .await
+    }
+
     async fn account_rate_limits(&self, workspace_id: String) -> Result<Value, String> {
         codex_core::account_rate_limits_core(&self.sessions, workspace_id).await
     }
@@ -941,6 +749,284 @@ impl DaemonState {
 
     async fn get_config_model(&self, workspace_id: String) -> Result<Value, String> {
         codex_core::get_config_model_core(&self.workspaces, workspace_id).await
+    }
+
+    async fn add_workspace(
+        &self,
+        path: String,
+        client_version: String,
+    ) -> Result<WorkspaceInfo, String> {
+        workspaces_core::add_workspace_core(
+            path,
+            &self.workspaces,
+            &self.sessions,
+            &self.app_settings,
+            &self.storage_path,
+            |entry, default_bin, codex_args, codex_home| {
+                spawn_with_client(
+                    self.event_sink.clone(),
+                    client_version.clone(),
+                    entry,
+                    default_bin,
+                    codex_args,
+                    codex_home,
+                )
+            },
+        )
+        .await
+    }
+
+    async fn add_workspace_from_git_url(
+        &self,
+        url: String,
+        destination_path: String,
+        target_folder_name: Option<String>,
+        client_version: String,
+    ) -> Result<WorkspaceInfo, String> {
+        workspaces_core::add_workspace_from_git_url_core(
+            url,
+            destination_path,
+            target_folder_name,
+            &self.workspaces,
+            &self.sessions,
+            &self.app_settings,
+            &self.storage_path,
+            |entry, default_bin, codex_args, codex_home| {
+                spawn_with_client(
+                    self.event_sink.clone(),
+                    client_version.clone(),
+                    entry,
+                    default_bin,
+                    codex_args,
+                    codex_home,
+                )
+            },
+        )
+        .await
+    }
+
+    async fn add_worktree(
+        &self,
+        parent_id: String,
+        branch: String,
+        name: Option<String>,
+        copy_agents_md: Option<bool>,
+        client_version: String,
+    ) -> Result<WorkspaceInfo, String> {
+        workspaces_core::add_worktree_core(
+            parent_id,
+            branch,
+            name,
+            copy_agents_md.unwrap_or(true),
+            &self.data_dir,
+            &self.workspaces,
+            &self.sessions,
+            &self.app_settings,
+            &self.storage_path,
+            |value| worktree_core::sanitize_worktree_name(value),
+            |base_dir, safe_name| worktree_core::unique_worktree_path_strict(base_dir, safe_name),
+            |root, branch_name| {
+                let root = root.clone();
+                let branch_name = branch_name.to_string();
+                async move { git_branch_exists(&root, &branch_name).await }
+            },
+            None::<fn(&PathBuf, &str) -> std::future::Ready<Result<Option<String>, String>>>,
+            |root, args| {
+                workspaces_core::run_git_command_unit(root, args, |repo, args_owned| {
+                    run_git_command_owned(repo, args_owned)
+                })
+            },
+            |entry, default_bin, codex_args, codex_home| {
+                spawn_with_client(
+                    self.event_sink.clone(),
+                    client_version.clone(),
+                    entry,
+                    default_bin,
+                    codex_args,
+                    codex_home,
+                )
+            },
+        )
+        .await
+    }
+
+    async fn worktree_setup_status(
+        &self,
+        workspace_id: String,
+    ) -> Result<WorktreeSetupStatus, String> {
+        workspaces_core::worktree_setup_status_core(
+            &self.workspaces,
+            workspace_id.as_str(),
+            &self.data_dir,
+        )
+        .await
+    }
+
+    async fn worktree_setup_mark_ran(&self, workspace_id: String) -> Result<(), String> {
+        workspaces_core::worktree_setup_mark_ran_core(
+            &self.workspaces,
+            workspace_id.as_str(),
+            &self.data_dir,
+        )
+        .await
+    }
+
+    async fn set_workspace_runtime_codex_args(
+        &self,
+        workspace_id: String,
+        codex_args: Option<String>,
+        client_version: String,
+    ) -> Result<workspaces_core::WorkspaceRuntimeCodexArgsResult, String> {
+        workspaces_core::set_workspace_runtime_codex_args_core(
+            workspace_id,
+            codex_args,
+            &self.workspaces,
+            &self.sessions,
+            &self.app_settings,
+            |entry, default_bin, args, home| {
+                spawn_with_client(
+                    self.event_sink.clone(),
+                    client_version.clone(),
+                    entry,
+                    default_bin,
+                    args,
+                    home,
+                )
+            },
+        )
+        .await
+    }
+
+    async fn remove_workspace(&self, id: String) -> Result<(), String> {
+        workspaces_core::remove_workspace_core(
+            id,
+            &self.workspaces,
+            &self.sessions,
+            &self.storage_path,
+            |root, args| {
+                workspaces_core::run_git_command_unit(root, args, |repo, args_owned| {
+                    run_git_command_owned(repo, args_owned)
+                })
+            },
+            |error| is_missing_worktree_error(error),
+            |path| {
+                std::fs::remove_dir_all(path)
+                    .map_err(|err| format!("Failed to remove directory: {err}"))
+            },
+            true,
+            true,
+        )
+        .await
+    }
+
+    async fn remove_worktree(&self, id: String) -> Result<(), String> {
+        workspaces_core::remove_worktree_core(
+            id,
+            &self.workspaces,
+            &self.sessions,
+            &self.storage_path,
+            |root, args| {
+                workspaces_core::run_git_command_unit(root, args, |repo, args_owned| {
+                    run_git_command_owned(repo, args_owned)
+                })
+            },
+            |error| is_missing_worktree_error(error),
+            |path| {
+                std::fs::remove_dir_all(path)
+                    .map_err(|err| format!("Failed to remove directory: {err}"))
+            },
+        )
+        .await
+    }
+
+    async fn rename_worktree(
+        &self,
+        id: String,
+        branch: Option<String>,
+        client_version: String,
+    ) -> Result<WorkspaceInfo, String> {
+        let desired = branch.unwrap_or_default();
+        workspaces_core::rename_worktree_core(
+            id,
+            desired,
+            &self.data_dir,
+            &self.workspaces,
+            &self.sessions,
+            &self.app_settings,
+            &self.storage_path,
+            |entry| resolve_git_root(entry),
+            |root, name| {
+                let root = root.clone();
+                let name = name.to_string();
+                async move {
+                    unique_branch_name(&root, &name, None)
+                        .await
+                        .map(|(branch_name, _)| branch_name)
+                }
+            },
+            |value| worktree_core::sanitize_worktree_name(value),
+            |base_dir, safe_name, current_path| {
+                worktree_core::unique_worktree_path_for_rename(base_dir, safe_name, current_path)
+            },
+            |root, args| {
+                workspaces_core::run_git_command_unit(root, args, |repo, args_owned| {
+                    run_git_command_owned(repo, args_owned)
+                })
+            },
+            |_entry, _default_bin, _codex_args, _codex_home| {
+                spawn_with_client(
+                    self.event_sink.clone(),
+                    client_version.clone(),
+                    _entry,
+                    _default_bin,
+                    _codex_args,
+                    _codex_home,
+                )
+            },
+        )
+        .await
+    }
+
+    async fn rename_worktree_upstream(
+        &self,
+        id: String,
+        old_branch: String,
+        new_branch: String,
+    ) -> Result<(), String> {
+        workspaces_core::rename_worktree_upstream_core(
+            id,
+            old_branch,
+            new_branch,
+            &self.workspaces,
+            |entry| resolve_git_root(entry),
+            |root, branch| {
+                let root = root.clone();
+                let branch = branch.to_string();
+                async move { git_branch_exists(&root, &branch).await }
+            },
+            |root, branch| {
+                let root = root.clone();
+                let branch = branch.to_string();
+                async move { git_find_remote_for_branch(&root, &branch).await }
+            },
+            |root, remote| {
+                let root = root.clone();
+                let remote = remote.to_string();
+                async move { git_remote_exists(&root, &remote).await }
+            },
+            |root, remote, branch| {
+                let root = root.clone();
+                let remote = remote.to_string();
+                let branch = branch.to_string();
+                async move { git_remote_branch_exists(&root, &remote, &branch).await }
+            },
+            |root, args| {
+                workspaces_core::run_git_command_unit(root, args, |repo, args_owned| {
+                    run_git_command_owned(repo, args_owned)
+                })
+            },
+        )
+        .await
     }
 
     async fn add_clone(
@@ -1491,15 +1577,20 @@ fn default_data_dir() -> PathBuf {
 fn usage() -> String {
     format!(
         "\
-USAGE:\n  codex-monitor-daemon [--listen <addr>] [--data-dir <path>] [--token <token> | --insecure-no-auth]\n\n\
-OPTIONS:\n  --listen <addr>          Bind address (default: {DEFAULT_LISTEN_ADDR})\n  --data-dir <path>        Data dir holding workspaces.json/settings.json\n  --token <token>          Shared token required by TCP clients\n  --insecure-no-auth       Disable TCP auth (dev only)\n  -h, --help               Show this help\n"
+USAGE:\n  codex-monitor-daemon [--listen <addr>] [--http-listen <addr>] [--data-dir <path>] [--token <token> | --insecure-no-auth]\n\n\
+OPTIONS:\n  --listen <addr>          Bind address for the TCP daemon (default: {DEFAULT_LISTEN_ADDR})\n  --http-listen <addr>     Optional bind address for browser HTTP/WS access\n  --data-dir <path>        Data dir holding workspaces.json/settings.json\n  --token <token>          Shared token required by TCP clients\n  --insecure-no-auth       Disable TCP auth (dev only)\n  -h, --help               Show this help\n"
     )
 }
 
-fn parse_args() -> Result<DaemonConfig, String> {
+fn parse_args_from<I, S>(args: I) -> Result<DaemonConfig, String>
+where
+    I: IntoIterator<Item = S>,
+    S: Into<String>,
+{
     let mut listen = DEFAULT_LISTEN_ADDR
         .parse::<SocketAddr>()
         .map_err(|err| err.to_string())?;
+    let mut http_listen: Option<SocketAddr> = None;
     let mut token = env::var("CODEX_MONITOR_DAEMON_TOKEN")
         .ok()
         .map(|value| value.trim().to_string())
@@ -1507,7 +1598,7 @@ fn parse_args() -> Result<DaemonConfig, String> {
     let mut insecure_no_auth = false;
     let mut data_dir: Option<PathBuf> = None;
 
-    let mut args = env::args().skip(1);
+    let mut args = args.into_iter().map(Into::into).skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "-h" | "--help" => {
@@ -1517,6 +1608,10 @@ fn parse_args() -> Result<DaemonConfig, String> {
             "--listen" => {
                 let value = args.next().ok_or("--listen requires a value")?;
                 listen = value.parse::<SocketAddr>().map_err(|err| err.to_string())?;
+            }
+            "--http-listen" => {
+                let value = args.next().ok_or("--http-listen requires a value")?;
+                http_listen = Some(value.parse::<SocketAddr>().map_err(|err| err.to_string())?);
             }
             "--token" => {
                 let value = args.next().ok_or("--token requires a value")?;
@@ -1551,9 +1646,14 @@ fn parse_args() -> Result<DaemonConfig, String> {
 
     Ok(DaemonConfig {
         listen,
+        http_listen,
         token,
         data_dir: data_dir.unwrap_or_else(default_data_dir),
     })
+}
+
+fn parse_args() -> Result<DaemonConfig, String> {
+    parse_args_from(env::args())
 }
 
 #[cfg(test)]
@@ -1570,6 +1670,43 @@ mod tests {
     use std::sync::Arc;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tokio::process::Command;
+
+    #[test]
+    fn usage_mentions_http_listen_option() {
+        let help = usage();
+        assert!(
+            help.contains("--http-listen <addr>"),
+            "expected daemon usage to document the HTTP listener option"
+        );
+    }
+
+    #[test]
+    fn parse_args_accepts_http_listen_override() {
+        let config = parse_args_from([
+            "codex-monitor-daemon",
+            "--listen",
+            "127.0.0.1:4732",
+            "--http-listen",
+            "127.0.0.1:8080",
+            "--token",
+            "token-1",
+        ])
+        .expect("parse args");
+
+        assert_eq!(config.listen, "127.0.0.1:4732".parse().expect("tcp addr"));
+        assert_eq!(
+            config.http_listen,
+            Some("127.0.0.1:8080".parse().expect("http addr"))
+        );
+    }
+
+    #[test]
+    fn parse_args_leaves_http_listener_disabled_by_default() {
+        let config = parse_args_from(["codex-monitor-daemon", "--token", "token-1"])
+            .expect("parse args");
+
+        assert!(config.http_listen.is_none());
+    }
 
     fn run_async_test<F>(future: F)
     where
@@ -1923,6 +2060,33 @@ fn main() {
         };
         let state = Arc::new(DaemonState::load(&config, event_sink));
         let config = Arc::new(config);
+
+        if let Some(http_listen) = config.http_listen {
+            let http_listener = match TcpListener::bind(http_listen).await {
+                Ok(listener) => listener,
+                Err(err) => {
+                    eprintln!("failed to bind HTTP listener {}: {err}", http_listen);
+                    std::process::exit(2);
+                }
+            };
+            let http_config = Arc::clone(&config);
+            let http_state = Arc::clone(&state);
+            let http_events = events_tx.clone();
+            eprintln!(
+                "codex-monitor-daemon HTTP listening on {}",
+                http_listener
+                    .local_addr()
+                    .map(|addr| addr.to_string())
+                    .unwrap_or_else(|_| http_listen.to_string())
+            );
+            tokio::spawn(async move {
+                if let Err(err) =
+                    http::serve(http_listener, http_config, http_state, http_events).await
+                {
+                    eprintln!("http server exited: {err}");
+                }
+            });
+        }
 
         let listener = match TcpListener::bind(config.listen).await {
             Ok(listener) => listener,

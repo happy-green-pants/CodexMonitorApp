@@ -1,4 +1,5 @@
 import { lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isTauri } from "@tauri-apps/api/core";
 import successSoundUrl from "@/assets/success-notification.mp3";
 import errorSoundUrl from "@/assets/error-notification.mp3";
 import { MainAppShell } from "@app/components/MainAppShell";
@@ -77,6 +78,7 @@ import {
 import { useAppShellOrchestration } from "@app/orchestration/useLayoutOrchestration";
 import { buildCodexArgsOptions } from "@threads/utils/codexArgsProfiles";
 import { normalizeCodexArgsInput } from "@/utils/codexArgsInput";
+import { isMobilePlatform } from "@/utils/platformPaths";
 import {
   resolveWorkspaceRuntimeCodexArgsBadgeLabel,
   resolveWorkspaceRuntimeCodexArgsOverride,
@@ -133,6 +135,24 @@ export default function MainApp() {
     "home" | "projects" | "codex" | "git" | "log"
   >("codex");
   const [mobileThreadRefreshLoading, setMobileThreadRefreshLoading] = useState(false);
+  const isMobileRuntimeEnvironment = useMemo(() => isMobilePlatform(), []);
+  const requiresRemoteSetupRuntime = useMemo(
+    () => isMobileRuntimeEnvironment || !isTauri(),
+    [isMobileRuntimeEnvironment],
+  );
+  const refreshWorkspacesRef = useRef<() => Promise<unknown>>(async () => undefined);
+  const {
+    isMobileRuntime,
+    showMobileSetupWizard,
+    mobileSetupWizardProps,
+    handleMobileConnectSuccess,
+    notifyRemoteSetupRequired,
+  } = useMobileServerSetup({
+    appSettings,
+    appSettingsLoading,
+    queueSaveSettings,
+    refreshWorkspaces: () => refreshWorkspacesRef.current(),
+  });
   const tabletTab =
     activeTab === "projects" || activeTab === "home" ? "codex" : activeTab;
   const {
@@ -153,6 +173,10 @@ export default function MainApp() {
     appendMobileRemoteWorkspacePathFromRecent,
     cancelMobileRemoteWorkspacePathPrompt,
     submitMobileRemoteWorkspacePathPrompt,
+    directoryBrowserPrompt,
+    onDirectoryBrowserNavigate,
+    onDirectoryBrowserConfirm,
+    onDirectoryBrowserCancel,
     addCloneAgent,
     addWorktreeAgent,
     connectWorkspace,
@@ -174,18 +198,13 @@ export default function MainApp() {
     appSettings,
     addDebugEntry,
     queueSaveSettings,
+    suspendInitialRefresh:
+      appSettings.backendMode === "remote" &&
+      requiresRemoteSetupRuntime &&
+      showMobileSetupWizard,
+    onRemoteSetupRequired: notifyRemoteSetupRequired,
   });
-  const {
-    isMobileRuntime,
-    showMobileSetupWizard,
-    mobileSetupWizardProps,
-    handleMobileConnectSuccess,
-  } = useMobileServerSetup({
-    appSettings,
-    appSettingsLoading,
-    queueSaveSettings,
-    refreshWorkspaces,
-  });
+  refreshWorkspacesRef.current = refreshWorkspaces;
   const updaterEnabled = !isMobileRuntime;
 
   const workspacesById = useMemo(
@@ -1089,6 +1108,10 @@ export default function MainApp() {
       appendMobileRemoteWorkspacePathFromRecent,
       cancelMobileRemoteWorkspacePathPrompt,
       submitMobileRemoteWorkspacePathPrompt,
+      directoryBrowserPrompt,
+      onDirectoryBrowserNavigate,
+      onDirectoryBrowserConfirm,
+      onDirectoryBrowserCancel,
       openWorkspaceFromUrlPrompt,
       workspaceFromUrl: {
         workspaceFromUrlPrompt,
@@ -1165,6 +1188,8 @@ export default function MainApp() {
     threadStatusById,
     threadListLoadingByWorkspace,
     getWorkspaceGroupName,
+    suspendRemoteLoading: showMobileSetupWizard,
+    onRemoteSetupRequired: notifyRemoteSetupRequired,
   });
 
   const activeRateLimits = activeWorkspaceId
@@ -1327,6 +1352,7 @@ export default function MainApp() {
     threadStatusById,
     remoteThreadConnectionState,
     refreshThread,
+    suspendRemoteLoading: showMobileSetupWizard,
   });
 
   const {

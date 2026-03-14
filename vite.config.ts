@@ -97,6 +97,7 @@ export default defineConfig(async () => ({
     port: 1420,
     strictPort: true,
     host: host || false,
+    allowedHosts: ["codex-monitor.pklm.cloud"],
     hmr: host
       ? {
           protocol: "ws",

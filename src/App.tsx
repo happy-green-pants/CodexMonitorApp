@@ -33,6 +33,7 @@ import "./styles/worktree-modal.css";
 import "./styles/clone-modal.css";
 import "./styles/workspace-from-url-modal.css";
 import "./styles/mobile-remote-workspace-modal.css";
+import "./styles/directory-browser-modal.css";
 import "./styles/branch-switcher-modal.css";
 import "./styles/git-init-modal.css";
 import "./styles/settings.css";

@@ -836,6 +836,7 @@ describe("useThreadActions", () => {
     });
 
     expect(listThreads).toHaveBeenCalledTimes(1);
+    expect(listWorkspaces).not.toHaveBeenCalled();
     expect(listThreads).toHaveBeenCalledWith("ws-1", null, 100, "updated_at");
     expect(dispatch).toHaveBeenCalledWith({
       type: "setThreads",

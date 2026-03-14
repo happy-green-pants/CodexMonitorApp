@@ -1,6 +1,11 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke as tauriInvoke, isTauri } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type { Options as NotificationOptions } from "@tauri-apps/plugin-notification";
+import {
+  browserRemoteInvoke,
+  loadBrowserRemoteSettings,
+  saveBrowserRemoteSettings,
+} from "./browserRemote";
 import type {
   AppSettings,
   CodexUpdateResult,
@@ -16,6 +21,7 @@ import type {
   WorkspaceInfo,
   AppMention,
   WorkspaceSettings,
+  DirectoryListingResponse,
 } from "../types";
 import type {
   GitFileDiff,
@@ -35,6 +41,40 @@ function isMissingTauriInvokeError(error: unknown) {
     (error.message.includes("reading 'invoke'") ||
       error.message.includes("reading \"invoke\""))
   );
+}
+
+async function invoke<T>(
+  command: string,
+  payload?: Record<string, unknown>,
+): Promise<T> {
+  if (isTauri()) {
+    return payload === undefined
+      ? tauriInvoke<T>(command)
+      : tauriInvoke<T>(command, payload);
+  }
+
+  switch (command) {
+    case "get_app_settings":
+      return loadBrowserRemoteSettings() as T;
+    case "update_app_settings":
+      return saveBrowserRemoteSettings(
+        (payload?.settings as Partial<AppSettings> | undefined) ?? {},
+      ) as T;
+    case "is_mobile_runtime":
+      return false as T;
+    default: {
+      const browserSettings = loadBrowserRemoteSettings();
+      if (
+        browserSettings.backendMode !== "remote" ||
+        browserSettings.remoteBackendProvider !== "http"
+      ) {
+        throw new Error(
+          "Browser runtime currently only supports the remote HTTP provider.",
+        );
+      }
+      return browserRemoteInvoke<T>(command, payload ?? {});
+    }
+  }
 }
 
 export async function pickWorkspacePath(): Promise<string | null> {
@@ -248,6 +288,20 @@ export async function getConfigModel(workspaceId: string): Promise<string | null
   return trimmed.length > 0 ? trimmed : null;
 }
 
+export async function listDirectoryEntries(
+  path: string | null,
+  options?: {
+    limit?: number;
+    showHidden?: boolean;
+  },
+): Promise<DirectoryListingResponse> {
+  return invoke<DirectoryListingResponse>("list_directory_entries", {
+    path: path ?? null,
+    limit: options?.limit ?? null,
+    showHidden: options?.showHidden ?? false,
+  });
+}
+
 export async function addWorkspace(path: string): Promise<WorkspaceInfo> {
   return invoke<WorkspaceInfo>("add_workspace", { path });
 }
@@ -255,12 +309,12 @@ export async function addWorkspace(path: string): Promise<WorkspaceInfo> {
 export async function addWorkspaceFromGitUrl(
   url: string,
   destinationPath: string,
-  targetFolderName: string | null,
+  targetFolderName?: string | null,
 ): Promise<WorkspaceInfo> {
   return invoke<WorkspaceInfo>("add_workspace_from_git_url", {
     url,
     destinationPath,
-    targetFolderName,
+    targetFolderName: targetFolderName ?? null,
   });
 }
 

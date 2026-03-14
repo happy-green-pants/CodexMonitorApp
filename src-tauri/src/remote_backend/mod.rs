@@ -232,15 +232,22 @@ async fn ensure_remote_backend(state: &AppState, app: AppHandle) -> Result<Remot
 fn resolve_transport_config(
     settings: &crate::types::AppSettings,
 ) -> Result<RemoteTransportConfig, String> {
-    let host = if settings.remote_backend_host.trim().is_empty() {
-        DEFAULT_REMOTE_HOST.to_string()
-    } else {
-        settings.remote_backend_host.clone()
-    };
-    Ok(RemoteTransportConfig::Tcp {
-        host,
-        auth_token: settings.remote_backend_token.clone(),
-    })
+    match settings.remote_backend_provider {
+        crate::types::RemoteBackendProvider::Tcp => {
+            let host = if settings.remote_backend_host.trim().is_empty() {
+                DEFAULT_REMOTE_HOST.to_string()
+            } else {
+                settings.remote_backend_host.clone()
+            };
+            Ok(RemoteTransportConfig::Tcp {
+                host,
+                auth_token: settings.remote_backend_token.clone(),
+            })
+        }
+        crate::types::RemoteBackendProvider::Http => Err(
+            "HTTP remote provider is only supported in the browser runtime.".to_string(),
+        ),
+    }
 }
 
 #[cfg(test)]
@@ -259,6 +266,16 @@ mod tests {
             panic!("expected tcp transport config");
         };
         assert_eq!(host, "tcp.example:4732");
+    }
+
+    #[test]
+    fn resolve_http_transport_returns_browser_only_error() {
+        let mut settings = AppSettings::default();
+        settings.remote_backend_provider = crate::types::RemoteBackendProvider::Http;
+        settings.remote_backend_host = "https://codex.example.com".to_string();
+
+        let error = resolve_transport_config(&settings).expect_err("http unsupported");
+        assert!(error.contains("browser runtime"));
     }
 
     #[test]

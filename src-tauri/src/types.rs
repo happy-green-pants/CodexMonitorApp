@@ -658,6 +658,7 @@ impl Default for BackendMode {
 #[serde(rename_all = "lowercase")]
 pub(crate) enum RemoteBackendProvider {
     Tcp,
+    Http,
 }
 
 impl Default for RemoteBackendProvider {
@@ -1350,6 +1351,37 @@ mod tests {
         assert_eq!(settings.selected_open_app_id, expected_open_id);
         assert_eq!(settings.open_app_targets.len(), 6);
         assert_eq!(settings.open_app_targets[0].id, "vscode");
+    }
+
+    #[test]
+    fn app_settings_deserialize_http_remote_provider() {
+        let settings: AppSettings = serde_json::from_str(
+            r#"{
+  "remoteBackendProvider": "http",
+  "remoteBackendHost": "https://codex.example.com",
+  "remoteBackends": [
+    {
+      "id": "remote-web",
+      "name": "Web remote",
+      "provider": "http",
+      "host": "https://codex.example.com"
+    }
+  ],
+  "activeRemoteBackendId": "remote-web"
+}"#,
+        )
+        .expect("settings deserialize");
+
+        assert!(matches!(
+            settings.remote_backend_provider,
+            RemoteBackendProvider::Http
+        ));
+        assert_eq!(settings.remote_backend_host, "https://codex.example.com");
+        assert_eq!(settings.remote_backends.len(), 1);
+        assert!(matches!(
+            settings.remote_backends[0].provider,
+            RemoteBackendProvider::Http
+        ));
     }
 
     #[test]

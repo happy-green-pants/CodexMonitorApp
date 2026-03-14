@@ -16,6 +16,7 @@ import {
 
 type AddRemoteBackendDraft = {
   name: string;
+  provider: AppSettings["remoteBackendProvider"];
   host: string;
   token: string;
 };
@@ -24,6 +25,7 @@ type SettingsServerSectionProps = {
   appSettings: AppSettings;
   onUpdateAppSettings: (next: AppSettings) => Promise<void>;
   isMobilePlatform: boolean;
+  supportsDesktopControls: boolean;
   mobileConnectBusy: boolean;
   mobileConnectStatusText: string | null;
   mobileConnectStatusError: boolean;
@@ -34,6 +36,7 @@ type SettingsServerSectionProps = {
   remoteNameError: string | null;
   remoteHostError: string | null;
   remoteNameDraft: string;
+  remoteProviderDraft: AppSettings["remoteBackendProvider"];
   remoteHostDraft: string;
   remoteTokenDraft: string;
   nextRemoteNameSuggestion: string;
@@ -46,6 +49,9 @@ type SettingsServerSectionProps = {
   tcpDaemonStatus: TcpDaemonStatus | null;
   tcpDaemonBusyAction: "start" | "stop" | "status" | null;
   onSetRemoteNameDraft: Dispatch<SetStateAction<string>>;
+  onSetRemoteProviderDraft: (
+    value: AppSettings["remoteBackendProvider"],
+  ) => Promise<void>;
   onSetRemoteHostDraft: Dispatch<SetStateAction<string>>;
   onSetRemoteTokenDraft: Dispatch<SetStateAction<string>>;
   onCommitRemoteName: () => Promise<void>;
@@ -68,6 +74,7 @@ export function SettingsServerSection({
   appSettings,
   onUpdateAppSettings,
   isMobilePlatform,
+  supportsDesktopControls,
   mobileConnectBusy,
   mobileConnectStatusText,
   mobileConnectStatusError,
@@ -78,6 +85,7 @@ export function SettingsServerSection({
   remoteNameError,
   remoteHostError,
   remoteNameDraft,
+  remoteProviderDraft,
   remoteHostDraft,
   remoteTokenDraft,
   nextRemoteNameSuggestion,
@@ -90,6 +98,7 @@ export function SettingsServerSection({
   tcpDaemonStatus,
   tcpDaemonBusyAction,
   onSetRemoteNameDraft,
+  onSetRemoteProviderDraft,
   onSetRemoteHostDraft,
   onSetRemoteTokenDraft,
   onCommitRemoteName,
@@ -114,9 +123,11 @@ export function SettingsServerSection({
   const [addRemoteBusy, setAddRemoteBusy] = useState(false);
   const [addRemoteError, setAddRemoteError] = useState<string | null>(null);
   const [addRemoteNameDraft, setAddRemoteNameDraft] = useState("");
+  const [addRemoteProviderDraft, setAddRemoteProviderDraft] =
+    useState<AppSettings["remoteBackendProvider"]>("tcp");
   const [addRemoteHostDraft, setAddRemoteHostDraft] = useState("");
   const [addRemoteTokenDraft, setAddRemoteTokenDraft] = useState("");
-  const isMobileSimplified = isMobilePlatform;
+  const isRemoteOnlyRuntime = isMobilePlatform || !supportsDesktopControls;
   const pendingDeleteRemote = useMemo(
     () =>
       pendingDeleteRemoteId == null
@@ -142,6 +153,7 @@ export function SettingsServerSection({
   const openAddRemoteModal = () => {
     setAddRemoteError(null);
     setAddRemoteNameDraft(nextRemoteNameSuggestion);
+    setAddRemoteProviderDraft(remoteProviderDraft);
     setAddRemoteHostDraft(remoteHostDraft);
     setAddRemoteTokenDraft("");
     setAddRemoteOpen(true);
@@ -165,6 +177,7 @@ export function SettingsServerSection({
       try {
         await onAddRemoteBackend({
           name: addRemoteNameDraft,
+          provider: addRemoteProviderDraft,
           host: addRemoteHostDraft,
           token: addRemoteTokenDraft,
         });
@@ -181,13 +194,12 @@ export function SettingsServerSection({
     <SettingsSection
       title="Server"
       subtitle={
-        isMobileSimplified
-          ? "Configure TCP host/token from your desktop setup, then run a connection test."
-          : "Configure how CodexMonitor exposes TCP backend access for mobile and remote clients. Desktop usage remains local unless you explicitly connect through remote mode."
+        isRemoteOnlyRuntime
+          ? "Configure the remote server endpoint and token used to control Codex running on your server."
+          : "Configure how CodexMonitor exposes remote access for mobile and browser clients while preserving local desktop mode."
       }
     >
-
-      {!isMobileSimplified && (
+      {supportsDesktopControls && (
         <div className="settings-field">
           <label className="settings-field-label" htmlFor="backend-mode">
             Backend mode
@@ -207,14 +219,14 @@ export function SettingsServerSection({
             <option value="remote">Remote (daemon)</option>
           </select>
           <div className="settings-help">
-            Local keeps desktop requests in-process. Remote routes desktop requests through the same
-            TCP transport path used by mobile clients.
+            Local keeps desktop requests in-process. Remote routes desktop requests through the
+            same transport surface used by browser and mobile clients.
           </div>
         </div>
       )}
 
       <>
-        {isMobileSimplified && (
+        {isRemoteOnlyRuntime && (
           <>
             <div className="settings-field">
               <div className="settings-field-label">Saved remotes</div>
@@ -232,7 +244,9 @@ export function SettingsServerSection({
                           <div className="settings-mobile-remote-name">{entry.name}</div>
                           {isActive && <span className="settings-mobile-remote-badge">Active</span>}
                         </div>
-                        <div className="settings-mobile-remote-meta">TCP · {entry.host}</div>
+                        <div className="settings-mobile-remote-meta">
+                          {entry.provider.toUpperCase()} · {entry.host}
+                        </div>
                         <div className="settings-mobile-remote-last">
                           Last connected:{" "}
                           {typeof entry.lastConnectedAtMs === "number"
@@ -316,7 +330,7 @@ export function SettingsServerSection({
                 id="mobile-remote-name"
                 className="settings-input settings-input--compact"
                 value={remoteNameDraft}
-                placeholder="My desktop"
+                placeholder="Production server"
                 onChange={(event) => onSetRemoteNameDraft(event.target.value)}
                 onBlur={() => {
                   void onCommitRemoteName();
@@ -333,7 +347,7 @@ export function SettingsServerSection({
           </>
         )}
 
-        {!isMobileSimplified && (
+        {supportsDesktopControls && (
           <SettingsToggleRow
             title="Keep daemon running after app closes"
             subtitle="If disabled, CodexMonitor stops managed TCP daemon processes before exit."
@@ -351,12 +365,32 @@ export function SettingsServerSection({
         )}
 
         <div className="settings-field">
-          <div className="settings-field-label">Remote backend</div>
+          <div className="settings-field-label">Remote server / Endpoint</div>
           <div className="settings-field-row">
+            {isRemoteOnlyRuntime && (
+              <select
+                className="settings-select settings-select--compact"
+                style={{ width: "auto", minWidth: 92 }}
+                value={remoteProviderDraft}
+                onChange={(event) => {
+                  void onSetRemoteProviderDraft(
+                    event.target.value as AppSettings["remoteBackendProvider"],
+                  );
+                }}
+                aria-label="Remote provider"
+              >
+                <option value="tcp">TCP</option>
+                <option value="http">HTTP</option>
+              </select>
+            )}
             <input
               className="settings-input settings-input--compact"
               value={remoteHostDraft}
-              placeholder="127.0.0.1:4732"
+              placeholder={
+                remoteProviderDraft === "http"
+                  ? "https://codex.example.com"
+                  : "server.example.com:4732"
+              }
               onChange={(event) => onSetRemoteHostDraft(event.target.value)}
               onBlur={() => {
                 void onCommitRemoteHost();
@@ -367,7 +401,7 @@ export function SettingsServerSection({
                   void onCommitRemoteHost();
                 }
               }}
-              aria-label="Remote backend host"
+              aria-label="Remote endpoint"
             />
             <input
               type="password"
@@ -384,18 +418,18 @@ export function SettingsServerSection({
                   void onCommitRemoteToken();
                 }
               }}
-              aria-label="Remote backend token"
+              aria-label="Remote token"
             />
           </div>
           {remoteHostError && <div className="settings-help settings-help-error">{remoteHostError}</div>}
           <div className="settings-help">
-            {isMobileSimplified
-              ? "Use the Tailscale host from your desktop CodexMonitor app (Server section), for example `macbook.your-tailnet.ts.net:4732`."
-              : "This host/token is used by mobile clients and desktop remote-mode testing."}
+            {isRemoteOnlyRuntime && remoteProviderDraft === "http"
+              ? "Use a full HTTP(S) endpoint such as `https://codex.example.com`."
+              : "Use a direct `host:port` address, for example `server.example.com:4732`."}
           </div>
         </div>
 
-        {isMobileSimplified && (
+        {isRemoteOnlyRuntime && (
           <div className="settings-field">
             <div className="settings-field-label">Connection test</div>
             <div className="settings-field-row">
@@ -414,13 +448,12 @@ export function SettingsServerSection({
               </div>
             )}
             <div className="settings-help">
-              Make sure your desktop app daemon is running and reachable on Tailscale, then retry
-              this test.
+              Ensure the remote server is reachable from this device, then retry this test.
             </div>
           </div>
         )}
 
-        {!isMobileSimplified && (
+        {supportsDesktopControls && (
           <div className="settings-field">
             <div className="settings-field-label">Mobile access daemon</div>
             <div className="settings-field-row">
@@ -462,13 +495,13 @@ export function SettingsServerSection({
               </div>
             )}
             <div className="settings-help">
-              Start this daemon before connecting from iOS. It uses your current token and listens
-              on <code>0.0.0.0:&lt;port&gt;</code>, matching your configured host port.
+              Start this daemon before exposing direct TCP access. It uses your current token and
+              listens on <code>0.0.0.0:&lt;port&gt;</code>, matching your configured host port.
             </div>
           </div>
         )}
 
-        {!isMobileSimplified && (
+        {supportsDesktopControls && (
           <div className="settings-field">
             <div className="settings-field-label">Tailscale helper</div>
             <div className="settings-field-row">
@@ -545,9 +578,9 @@ export function SettingsServerSection({
       </>
 
       <div className="settings-help">
-        {isMobileSimplified
-          ? "Use your own infrastructure only. On iOS, get the Tailscale hostname and token from your desktop CodexMonitor setup."
-          : "Mobile access should stay scoped to your own infrastructure (tailnet). CodexMonitor does not provide hosted backend services."}
+        {isRemoteOnlyRuntime
+          ? "Use your own secure infrastructure only. CodexMonitor does not provide hosted backend services."
+          : "Remote access should stay scoped to infrastructure you control. CodexMonitor does not provide hosted backend services."}
       </div>
       {addRemoteOpen && (
         <ModalShell
@@ -580,15 +613,40 @@ export function SettingsServerSection({
               disabled={addRemoteBusy}
             />
           </div>
+          {isRemoteOnlyRuntime && (
+            <div className="settings-field">
+              <label className="settings-field-label" htmlFor="settings-add-remote-provider">
+                Provider
+              </label>
+              <select
+                id="settings-add-remote-provider"
+                className="settings-select settings-select--compact"
+                value={addRemoteProviderDraft}
+                onChange={(event) =>
+                  setAddRemoteProviderDraft(
+                    event.target.value as AppSettings["remoteBackendProvider"],
+                  )
+                }
+                disabled={addRemoteBusy}
+              >
+                <option value="tcp">TCP (direct)</option>
+                <option value="http">HTTP/HTTPS</option>
+              </select>
+            </div>
+          )}
           <div className="settings-field">
             <label className="settings-field-label" htmlFor="settings-add-remote-host">
-              New remote host
+              New remote endpoint
             </label>
             <input
               id="settings-add-remote-host"
               className="settings-input settings-input--compact"
               value={addRemoteHostDraft}
-              placeholder="macbook.your-tailnet.ts.net:4732"
+              placeholder={
+                addRemoteProviderDraft === "http"
+                  ? "https://codex.example.com"
+                  : "server.example.com:4732"
+              }
               onChange={(event) => setAddRemoteHostDraft(event.target.value)}
               disabled={addRemoteBusy}
             />

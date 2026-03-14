@@ -75,6 +75,18 @@ pub(super) async fn try_handle(
                 state.is_workspace_path_dir(request.path).await,
             ))
         }
+        "list_directory_entries" => {
+            let request =
+                parse_request_or_err!(params, workspace_rpc::ListDirectoryEntriesRequest);
+            Some(
+                serialize_result(state.list_directory_entries(
+                    request.path,
+                    request.limit,
+                    request.show_hidden.unwrap_or(false),
+                ))
+                .await,
+            )
+        }
         "add_workspace" => {
             let request = parse_request_or_err!(params, workspace_rpc::AddWorkspaceRequest);
             Some(
@@ -102,7 +114,7 @@ pub(super) async fn try_handle(
                     request.parent_id,
                     request.branch,
                     request.name,
-                    request.copy_agents_md,
+                    Some(request.copy_agents_md),
                     client_version.to_string(),
                 ))
                 .await,
@@ -147,7 +159,7 @@ pub(super) async fn try_handle(
             Some(
                 serialize_result(state.rename_worktree(
                     request.id,
-                    request.branch,
+                    Some(request.branch),
                     client_version.to_string(),
                 ))
                 .await,

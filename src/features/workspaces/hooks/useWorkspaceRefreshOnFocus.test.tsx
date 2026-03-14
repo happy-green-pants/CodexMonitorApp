@@ -49,7 +49,10 @@ describe("useWorkspaceRefreshOnFocus", () => {
     expect(listThreadsForWorkspaces).toHaveBeenCalledTimes(1);
     expect(listThreadsForWorkspaces).toHaveBeenCalledWith(
       [expect.objectContaining({ id: "ws-1" })],
-      { preserveState: true },
+      expect.objectContaining({
+        preserveState: true,
+        allWorkspaces: [expect.objectContaining({ id: "ws-1" })],
+      }),
     );
   });
 
@@ -180,5 +183,30 @@ describe("useWorkspaceRefreshOnFocus", () => {
       await Promise.resolve();
     });
     expect(refreshWorkspaces).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not refresh while remote setup gate is active", async () => {
+    const refreshWorkspaces = vi.fn().mockResolvedValue([]);
+    const listThreadsForWorkspaces = vi.fn().mockResolvedValue(undefined);
+
+    renderHook(() =>
+      useWorkspaceRefreshOnFocus({
+        workspaces: [],
+        refreshWorkspaces,
+        listThreadsForWorkspaces,
+        backendMode: "remote",
+        pollIntervalMs: 1000,
+        suspended: true,
+      }),
+    );
+
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      vi.advanceTimersByTime(2000);
+      await Promise.resolve();
+    });
+
+    expect(refreshWorkspaces).toHaveBeenCalledTimes(0);
+    expect(listThreadsForWorkspaces).toHaveBeenCalledTimes(0);
   });
 });

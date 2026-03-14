@@ -25,6 +25,7 @@ type UseMainAppWorkspaceLifecycleArgs = {
   threadStatusById: Record<string, { isProcessing: boolean }>;
   remoteThreadConnectionState: "live" | "polling" | "disconnected";
   refreshThread: (workspaceId: string, threadId: string) => Promise<unknown>;
+  suspendRemoteLoading?: boolean;
 };
 
 export function useMainAppWorkspaceLifecycle({
@@ -42,6 +43,7 @@ export function useMainAppWorkspaceLifecycle({
   threadStatusById,
   remoteThreadConnectionState,
   refreshThread,
+  suspendRemoteLoading = false,
 }: UseMainAppWorkspaceLifecycleArgs) {
   useTabActivationGuard({
     activeTab,
@@ -64,6 +66,7 @@ export function useMainAppWorkspaceLifecycle({
     listThreadsForWorkspaces,
     backendMode,
     pollIntervalMs: REMOTE_WORKSPACE_REFRESH_INTERVAL_MS,
+    suspended: suspendRemoteLoading,
   });
 
   useRemoteThreadRefreshOnFocus({
@@ -74,7 +77,8 @@ export function useMainAppWorkspaceLifecycle({
       activeThreadId && threadStatusById[activeThreadId]?.isProcessing,
     ),
     suspendPolling:
-      backendMode === "remote" && remoteThreadConnectionState === "live",
+      suspendRemoteLoading ||
+      (backendMode === "remote" && remoteThreadConnectionState === "live"),
     reconnectWorkspace: connectWorkspace,
     refreshThread,
   });

@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import * as Sentry from "@sentry/react";
+import { isRemoteSetupRequiredError } from "../../../services/browserRemote";
 import type { DebugEntry, WorkspaceInfo, WorkspaceSettings } from "../../../types";
 import {
   addWorkspace as addWorkspaceService,
@@ -19,6 +20,7 @@ type UseWorkspaceCrudOptions = {
   setActiveWorkspaceId: Dispatch<SetStateAction<string | null>>;
   workspaceSettingsRef: MutableRefObject<Map<string, WorkspaceSettings>>;
   setHasLoaded: Dispatch<SetStateAction<boolean>>;
+  onRemoteSetupRequired?: (message?: string | null) => void;
 };
 
 export type AddWorkspacesFromPathsFailure = {
@@ -94,6 +96,7 @@ export function useWorkspaceCrud({
   setActiveWorkspaceId,
   workspaceSettingsRef,
   setHasLoaded,
+  onRemoteSetupRequired,
 }: UseWorkspaceCrudOptions) {
   const refreshWorkspaces = useCallback(async () => {
     try {
@@ -108,11 +111,15 @@ export function useWorkspaceCrud({
       setHasLoaded(true);
       return entries;
     } catch (err) {
-      console.error("Failed to load workspaces", err);
+      if (isRemoteSetupRequiredError(err)) {
+        onRemoteSetupRequired?.(err instanceof Error ? err.message : null);
+      } else {
+        console.error("Failed to load workspaces", err);
+      }
       setHasLoaded(true);
       return undefined;
     }
-  }, [setActiveWorkspaceId, setHasLoaded, setWorkspaces]);
+  }, [onRemoteSetupRequired, setActiveWorkspaceId, setHasLoaded, setWorkspaces]);
 
   const addWorkspaceFromPath = useCallback(
     async (path: string, options?: { activate?: boolean }) => {

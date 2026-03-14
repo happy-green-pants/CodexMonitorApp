@@ -6,7 +6,7 @@ import {
   type KeyboardEvent,
   type RefObject,
 } from "react";
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { convertFileSrc, isTauri } from "@tauri-apps/api/core";
 import type {
   AppOption,
   CustomPromptOption,
@@ -163,7 +163,19 @@ export function WorkspaceHome({
   const [showIcon, setShowIcon] = useState(true);
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
   const iconPath = useMemo(() => buildIconPath(workspace.path), [workspace.path]);
-  const iconSrc = useMemo(() => convertFileSrc(iconPath), [iconPath]);
+  const iconSrc = useMemo(() => {
+    if (!showIcon) {
+      return "";
+    }
+    if (!isTauri()) {
+      return "";
+    }
+    try {
+      return convertFileSrc(iconPath);
+    } catch {
+      return "";
+    }
+  }, [iconPath, showIcon]);
   const fallbackTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const textareaRef = textareaRefProp ?? fallbackTextareaRef;
   const {
@@ -348,9 +360,9 @@ export function WorkspaceHome({
   const agentMdRefreshDisabled = agentMdLoading || agentMdSaving;
 
   return (
-    <div className="workspace-home">
+      <div className="workspace-home">
       <div className="workspace-home-hero">
-        {showIcon && (
+        {showIcon && iconSrc && (
           <img
             className="workspace-home-icon"
             src={iconSrc}

@@ -90,6 +90,10 @@ type UseMainAppModalsArgs = {
       | "onWorkspaceFromUrlPromptCancel"
       | "onWorkspaceFromUrlPromptConfirm"
     >;
+    directoryBrowserPrompt: AppModalsProps["directoryBrowserPrompt"];
+    onDirectoryBrowserNavigate: (path: string | null) => void;
+    onDirectoryBrowserConfirm: (path: string) => void;
+    onDirectoryBrowserCancel: () => void;
   };
   settings: {
     handleMoveWorkspace: (id: string, direction: "up" | "down") => void;
@@ -329,6 +333,10 @@ export function useMainAppModals({
         workspacePrompts.cancelMobileRemoteWorkspacePathPrompt,
       onMobileRemoteWorkspacePathPromptConfirm:
         workspacePrompts.submitMobileRemoteWorkspacePathPrompt,
+      directoryBrowserPrompt: workspacePrompts.directoryBrowserPrompt,
+      onDirectoryBrowserNavigate: workspacePrompts.onDirectoryBrowserNavigate,
+      onDirectoryBrowserConfirm: workspacePrompts.onDirectoryBrowserConfirm,
+      onDirectoryBrowserCancel: workspacePrompts.onDirectoryBrowserCancel,
       branchSwitcher,
       branches,
       workspaces,

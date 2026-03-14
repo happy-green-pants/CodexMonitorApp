@@ -1,12 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isTauri } from "@tauri-apps/api/core";
 import { ask, message } from "@tauri-apps/plugin-dialog";
-import type { WorkspaceInfo } from "../../../types";
+import type { DirectoryEntry, WorkspaceInfo } from "../../../types";
 import { isMobilePlatform } from "../../../utils/platformPaths";
-import { pickWorkspacePaths } from "../../../services/tauri";
+import { listDirectoryEntries, pickWorkspacePaths } from "../../../services/tauri";
 import type { AddWorkspacesFromPathsResult } from "../../workspaces/hooks/useWorkspaceCrud";
 
 const RECENT_REMOTE_WORKSPACE_PATHS_STORAGE_KEY = "mobile-remote-workspace-recent-paths";
 const RECENT_REMOTE_WORKSPACE_PATHS_LIMIT = 5;
+
+function isBrowserRuntime() {
+  return typeof window !== "undefined" && !isTauri();
+}
+
+function isRemoteUnavailableError(error: unknown) {
+  if (error instanceof TypeError) {
+    return error.message.includes("Failed to fetch") || error.message.includes("NetworkError");
+  }
+  if (error instanceof Error) {
+    return error.message.includes("Remote server is unreachable");
+  }
+  return false;
+}
 
 function parseWorkspacePathInput(value: string) {
   const stripWrappingQuotes = (entry: string) => {
@@ -95,19 +110,37 @@ type MobileRemoteWorkspacePathPromptState = {
   recentPaths: string[];
 } | null;
 
+type DirectoryBrowserPromptState = {
+  currentPath: string | null;
+  entries: DirectoryEntry[];
+  isLoading: boolean;
+  error: string | null;
+} | null;
+
 export function useWorkspaceDialogs() {
   const [recentMobileRemoteWorkspacePaths, setRecentMobileRemoteWorkspacePaths] = useState<
     string[]
   >(() => loadRecentRemoteWorkspacePaths());
   const [mobileRemoteWorkspacePathPrompt, setMobileRemoteWorkspacePathPrompt] =
     useState<MobileRemoteWorkspacePathPromptState>(null);
+  const [directoryBrowserPrompt, setDirectoryBrowserPrompt] =
+    useState<DirectoryBrowserPromptState>(null);
   const mobileRemoteWorkspacePathResolveRef = useRef<((paths: string[]) => void) | null>(
     null,
   );
+  const directoryBrowserResolveRef = useRef<((paths: string[]) => void) | null>(null);
 
   const resolveMobileRemoteWorkspacePathRequest = useCallback((paths: string[]) => {
     const resolve = mobileRemoteWorkspacePathResolveRef.current;
     mobileRemoteWorkspacePathResolveRef.current = null;
+    if (resolve) {
+      resolve(paths);
+    }
+  }, []);
+
+  const resolveDirectoryBrowserRequest = useCallback((paths: string[]) => {
+    const resolve = directoryBrowserResolveRef.current;
+    directoryBrowserResolveRef.current = null;
     if (resolve) {
       resolve(paths);
     }
@@ -194,18 +227,81 @@ export function useWorkspaceDialogs() {
     resolveMobileRemoteWorkspacePathRequest(paths);
   }, [mobileRemoteWorkspacePathPrompt, resolveMobileRemoteWorkspacePathRequest]);
 
+  const navigateDirectoryBrowser = useCallback(async (path: string | null) => {
+    setDirectoryBrowserPrompt((prev) => ({
+      currentPath: path,
+      entries: prev?.entries ?? [],
+      isLoading: true,
+      error: null,
+    }));
+
+    try {
+      const result = await listDirectoryEntries(path, { limit: 200, showHidden: false });
+      setDirectoryBrowserPrompt({
+        currentPath: result.currentPath,
+        entries: result.entries,
+        isLoading: false,
+        error: null,
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Remote server is unreachable.";
+      const friendlyMessage = isRemoteUnavailableError(error)
+        ? "Remote server is unreachable. Check Settings → Server and ensure the remote backend is running."
+        : errorMessage.trim().length > 0
+          ? errorMessage
+          : "Remote server is unreachable. Check Settings → Server.";
+      setDirectoryBrowserPrompt((prev) => ({
+        currentPath: prev?.currentPath ?? path,
+        entries: prev?.entries ?? [],
+        isLoading: false,
+        error: friendlyMessage,
+      }));
+    }
+  }, []);
+
+  const requestDirectoryBrowserPaths = useCallback(() => {
+    if (directoryBrowserResolveRef.current) {
+      resolveDirectoryBrowserRequest([]);
+    }
+    void navigateDirectoryBrowser(null);
+    return new Promise<string[]>((resolve) => {
+      directoryBrowserResolveRef.current = resolve;
+    });
+  }, [navigateDirectoryBrowser, resolveDirectoryBrowserRequest]);
+
+  const confirmDirectoryBrowserSelection = useCallback(
+    (path: string) => {
+      setDirectoryBrowserPrompt(null);
+      resolveDirectoryBrowserRequest([path]);
+    },
+    [resolveDirectoryBrowserRequest],
+  );
+
+  const cancelDirectoryBrowserPrompt = useCallback(() => {
+    setDirectoryBrowserPrompt(null);
+    resolveDirectoryBrowserRequest([]);
+  }, [resolveDirectoryBrowserRequest]);
+
   useEffect(() => {
     return () => {
       resolveMobileRemoteWorkspacePathRequest([]);
+      resolveDirectoryBrowserRequest([]);
     };
-  }, [resolveMobileRemoteWorkspacePathRequest]);
+  }, [resolveDirectoryBrowserRequest, resolveMobileRemoteWorkspacePathRequest]);
 
-  const requestWorkspacePaths = useCallback(async (backendMode?: string) => {
-    if (isMobilePlatform() && backendMode === "remote") {
-      return requestMobileRemoteWorkspacePaths();
-    }
-    return pickWorkspacePaths();
-  }, [requestMobileRemoteWorkspacePaths]);
+  const requestWorkspacePaths = useCallback(
+    async (backendMode?: string) => {
+      if (backendMode === "remote" && isBrowserRuntime()) {
+        return requestDirectoryBrowserPaths();
+      }
+      if (backendMode === "remote" && isMobilePlatform()) {
+        return requestMobileRemoteWorkspacePaths();
+      }
+      return pickWorkspacePaths();
+    },
+    [requestDirectoryBrowserPaths, requestMobileRemoteWorkspacePaths],
+  );
 
   const showAddWorkspacesResult = useCallback(
     async (result: AddWorkspacesFromPathsResult) => {
@@ -256,10 +352,16 @@ export function useWorkspaceDialogs() {
         result.failures.length > 0
           ? "Some workspaces failed to add"
           : "Some workspaces were skipped";
-      await message(lines.join("\n"), {
-        title,
-        kind: result.failures.length > 0 ? "error" : "warning",
-      });
+      try {
+        await message(lines.join("\n"), {
+          title,
+          kind: result.failures.length > 0 ? "error" : "warning",
+        });
+      } catch {
+        if (typeof window !== "undefined") {
+          window.alert(`${title}\n\n${lines.join("\n")}`);
+        }
+      }
     },
     [],
   );
@@ -277,16 +379,21 @@ export function useWorkspaceDialogs() {
               worktreeCount === 1 ? "" : "s"
             } on disk.`
           : "";
+      const promptText = `Are you sure you want to delete "${workspaceName}"?\n\nThis will remove the workspace from CodexMonitor.${detail}`;
 
-      return ask(
-        `Are you sure you want to delete "${workspaceName}"?\n\nThis will remove the workspace from CodexMonitor.${detail}`,
-        {
+      try {
+        return await ask(promptText, {
           title: "Delete Workspace",
           kind: "warning",
           okLabel: "Delete",
           cancelLabel: "Cancel",
-        },
-      );
+        });
+      } catch {
+        if (typeof window !== "undefined") {
+          return window.confirm(promptText);
+        }
+        return false;
+      }
     },
     [],
   );
@@ -295,33 +402,50 @@ export function useWorkspaceDialogs() {
     async (workspaces: WorkspaceInfo[], workspaceId: string) => {
       const workspace = workspaces.find((entry) => entry.id === workspaceId);
       const workspaceName = workspace?.name || "this worktree";
-      return ask(
-        `Are you sure you want to delete "${workspaceName}"?\n\nThis will close the agent, remove its worktree, and delete it from CodexMonitor.`,
-        {
+      const promptText = `Are you sure you want to delete "${workspaceName}"?\n\nThis will close the agent, remove its worktree, and delete it from CodexMonitor.`;
+      try {
+        return await ask(promptText, {
           title: "Delete Worktree",
           kind: "warning",
           okLabel: "Delete",
           cancelLabel: "Cancel",
-        },
-      );
+        });
+      } catch {
+        if (typeof window !== "undefined") {
+          return window.confirm(promptText);
+        }
+        return false;
+      }
     },
     [],
   );
 
   const showWorkspaceRemovalError = useCallback(async (error: unknown) => {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    await message(errorMessage, {
-      title: "Delete workspace failed",
-      kind: "error",
-    });
+    try {
+      await message(errorMessage, {
+        title: "Delete workspace failed",
+        kind: "error",
+      });
+    } catch {
+      if (typeof window !== "undefined") {
+        window.alert(`Delete workspace failed\n\n${errorMessage}`);
+      }
+    }
   }, []);
 
   const showWorktreeRemovalError = useCallback(async (error: unknown) => {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    await message(errorMessage, {
-      title: "Delete worktree failed",
-      kind: "error",
-    });
+    try {
+      await message(errorMessage, {
+        title: "Delete worktree failed",
+        kind: "error",
+      });
+    } catch {
+      if (typeof window !== "undefined") {
+        window.alert(`Delete worktree failed\n\n${errorMessage}`);
+      }
+    }
   }, []);
 
   return {
@@ -332,6 +456,10 @@ export function useWorkspaceDialogs() {
     submitMobileRemoteWorkspacePathPrompt,
     appendMobileRemoteWorkspacePathFromRecent,
     rememberRecentMobileRemoteWorkspacePaths,
+    directoryBrowserPrompt,
+    onDirectoryBrowserNavigate: navigateDirectoryBrowser,
+    onDirectoryBrowserConfirm: confirmDirectoryBrowserSelection,
+    onDirectoryBrowserCancel: cancelDirectoryBrowserPrompt,
     showAddWorkspacesResult,
     confirmWorkspaceRemoval,
     confirmWorktreeRemoval,

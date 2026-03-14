@@ -1,7 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { isTauri } from "@tauri-apps/api/core";
 import type { Event, EventCallback, UnlistenFn } from "@tauri-apps/api/event";
 import { listen } from "@tauri-apps/api/event";
 import type { AppServerEvent } from "../types";
+import {
+  getBrowserRemoteWebSocketUrl,
+  loadBrowserRemoteSettings,
+} from "./browserRemote";
 import {
   subscribeAppServerEvents,
   subscribeMenuCycleCollaborationMode,
@@ -10,13 +15,86 @@ import {
   subscribeTerminalOutput,
 } from "./events";
 
+vi.mock("@tauri-apps/api/core", () => ({
+  isTauri: vi.fn(() => true),
+}));
+
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(),
 }));
 
+vi.mock("./browserRemote", () => ({
+  getBrowserRemoteWebSocketUrl: vi.fn(() => "wss://codex.example.com/rpc/ws"),
+  loadBrowserRemoteSettings: vi.fn(() => ({
+    backendMode: "remote",
+    remoteBackendProvider: "http",
+    remoteBackendHost: "https://codex.example.com",
+    remoteBackendToken: "token-1",
+    remoteBackends: [],
+    activeRemoteBackendId: "remote-default",
+  })),
+}));
+
+class MockWebSocket {
+  static instances: MockWebSocket[] = [];
+
+  url: string;
+  readyState = 0;
+  sent: string[] = [];
+  onopen: ((event: { type: string }) => void) | null = null;
+  onmessage: ((event: { data: string }) => void) | null = null;
+  onerror: ((event: { type: string }) => void) | null = null;
+  onclose: ((event: { code: number }) => void) | null = null;
+
+  constructor(url: string) {
+    this.url = url;
+    MockWebSocket.instances.push(this);
+  }
+
+  send(data: string) {
+    this.sent.push(data);
+  }
+
+  close() {
+    this.readyState = 3;
+  }
+
+  emitOpen() {
+    this.readyState = 1;
+    this.onopen?.({ type: "open" });
+  }
+
+  emitMessage(data: unknown) {
+    this.onmessage?.({ data: JSON.stringify(data) });
+  }
+
+  emitError() {
+    this.onerror?.({ type: "error" });
+  }
+
+  emitClose(code = 1000) {
+    this.readyState = 3;
+    this.onclose?.({ code });
+  }
+}
+
+const originalWebSocket = globalThis.WebSocket;
+
 describe("events subscriptions", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(isTauri).mockReturnValue(true);
+    vi.mocked(getBrowserRemoteWebSocketUrl).mockReturnValue("wss://codex.example.com/rpc/ws");
+    vi.mocked(loadBrowserRemoteSettings).mockReturnValue({
+      backendMode: "remote",
+      remoteBackendProvider: "http",
+      remoteBackendHost: "https://codex.example.com",
+      remoteBackendToken: "token-1",
+      remoteBackends: [],
+      activeRemoteBackendId: "remote-default",
+    });
+    MockWebSocket.instances = [];
+    globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket;
   });
 
   it("delivers payloads and unsubscribes on cleanup", async () => {
@@ -126,4 +204,60 @@ describe("events subscriptions", () => {
 
     cleanup();
   });
+
+  it("uses the browser websocket bridge outside Tauri", async () => {
+    vi.mocked(isTauri).mockReturnValue(false);
+
+    const onEvent = vi.fn();
+    const cleanup = subscribeAppServerEvents(onEvent);
+    const socket = MockWebSocket.instances[0];
+
+    expect(socket?.url).toBe("wss://codex.example.com/rpc/ws");
+
+    socket.emitOpen();
+    expect(socket.sent).toEqual([
+      JSON.stringify({
+        id: 1,
+        method: "auth",
+        params: { token: "token-1" },
+      }),
+    ]);
+
+    socket.emitMessage({ id: 1, result: { ok: true } });
+    await Promise.resolve();
+
+    const payload: AppServerEvent = {
+      workspace_id: "ws-browser",
+      message: { method: "thread.updated" },
+    };
+    socket.emitMessage({
+      method: "app-server-event",
+      params: payload,
+    });
+
+    expect(onEvent).toHaveBeenCalledWith(payload);
+
+    cleanup();
+    await Promise.resolve();
+    expect(socket.readyState).toBe(3);
+  });
+
+  it("reports websocket bootstrap errors outside Tauri", async () => {
+    vi.mocked(isTauri).mockReturnValue(false);
+
+    const onError = vi.fn();
+    const cleanup = subscribeTerminalOutput(() => {}, { onError });
+    const socket = MockWebSocket.instances[0];
+
+    socket.emitError();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onError).toHaveBeenCalled();
+    cleanup();
+  });
+});
+
+afterAll(() => {
+  globalThis.WebSocket = originalWebSocket;
 });

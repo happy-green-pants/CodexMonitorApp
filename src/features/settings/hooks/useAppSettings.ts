@@ -24,6 +24,7 @@ const allowedThemes = new Set(["system", "light", "dark", "dim"]);
 const allowedPersonality = new Set(["friendly", "pragmatic"]);
 const allowedFollowUpMessageBehavior = new Set(["queue", "steer"]);
 const DEFAULT_REMOTE_BACKEND_HOST = "127.0.0.1:4732";
+const DEFAULT_REMOTE_HTTP_ENDPOINT = "https://codex.example.com";
 const DEFAULT_REMOTE_BACKEND_ID = "remote-default";
 const DEFAULT_REMOTE_BACKEND_NAME = "Primary remote";
 const DEFAULT_REMOTE_PROVIDER: AppSettings["remoteBackendProvider"] = "tcp";
@@ -31,16 +32,37 @@ const DEFAULT_REMOTE_PROVIDER: AppSettings["remoteBackendProvider"] = "tcp";
 type RemoteBackendTarget = AppSettings["remoteBackends"][number];
 
 function normalizeRemoteProvider(value: unknown): AppSettings["remoteBackendProvider"] {
-  void value;
-  return "tcp";
+  return value === "http" ? "http" : "tcp";
 }
 
 function normalizeRemoteToken(value: string | null | undefined): string | null {
   return value?.trim() ? value.trim() : null;
 }
 
-function normalizeRemoteHost(value: string | null | undefined): string {
-  return value?.trim() ? value.trim() : DEFAULT_REMOTE_BACKEND_HOST;
+function normalizeRemoteHost(
+  value: string | null | undefined,
+  provider: AppSettings["remoteBackendProvider"],
+): string {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) {
+    return provider === "http"
+      ? DEFAULT_REMOTE_HTTP_ENDPOINT
+      : DEFAULT_REMOTE_BACKEND_HOST;
+  }
+  if (provider === "http") {
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        return trimmed.replace(/\/+$/, "");
+      }
+    } catch {
+      // Fall back to the default endpoint below.
+    }
+    return DEFAULT_REMOTE_HTTP_ENDPOINT;
+  }
+  return /^([^:\s]+|\[[^\]]+\]):([0-9]{1,5})$/.test(trimmed)
+    ? trimmed
+    : DEFAULT_REMOTE_BACKEND_HOST;
 }
 
 function normalizeRemoteName(value: string | null | undefined, fallback: string): string {
@@ -55,7 +77,7 @@ function normalizeRemoteBackends(settings: AppSettings): {
   remoteBackendToken: string | null;
 } {
   const legacyProvider = normalizeRemoteProvider(settings.remoteBackendProvider);
-  const legacyHost = normalizeRemoteHost(settings.remoteBackendHost);
+  const legacyHost = normalizeRemoteHost(settings.remoteBackendHost, legacyProvider);
   const legacyToken = normalizeRemoteToken(settings.remoteBackendToken);
   const usedIds = new Set<string>();
 
@@ -72,7 +94,7 @@ function normalizeRemoteBackends(settings: AppSettings): {
       id,
       name: normalizeRemoteName(entry.name, `Remote ${index + 1}`),
       provider: normalizeRemoteProvider(entry.provider),
-      host: normalizeRemoteHost(entry.host),
+      host: normalizeRemoteHost(entry.host, normalizeRemoteProvider(entry.provider)),
       token: normalizeRemoteToken(entry.token),
       lastConnectedAtMs:
         typeof entry.lastConnectedAtMs === "number" && Number.isFinite(entry.lastConnectedAtMs)

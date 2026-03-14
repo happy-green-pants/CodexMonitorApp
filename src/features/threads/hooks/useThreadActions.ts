@@ -547,6 +547,7 @@ export function useThreadActions({
         preserveState?: boolean;
         sortKey?: ThreadListSortKey;
         maxPages?: number;
+        allWorkspaces?: WorkspaceInfo[];
       },
     ) => {
       const targets = workspaces.filter((workspace) => workspace.id);
@@ -584,18 +585,23 @@ export function useThreadActions({
       try {
         const requester = targets.find((workspace) => workspace.connected) ?? targets[0];
         const matchingThreadsByWorkspace: Record<string, Record<string, unknown>[]> = {};
-        let workspacePathLookup = buildWorkspacePathLookup(targets);
+        const knownWorkspaces = options?.allWorkspaces?.length
+          ? options.allWorkspaces
+          : targets;
+        let workspacePathLookup = buildWorkspacePathLookup(knownWorkspaces);
         const targetWorkspaceIds = new Set(targets.map((workspace) => workspace.id));
-        try {
-          const knownWorkspaces = await listWorkspacesService();
-          if (knownWorkspaces.length > 0) {
-            workspacePathLookup = buildWorkspacePathLookup([
-              ...targets,
-              ...knownWorkspaces,
-            ]);
+        if (!options?.allWorkspaces?.length && targets.length === 1) {
+          try {
+            const resolvedWorkspaces = await listWorkspacesService();
+            if (resolvedWorkspaces.length > 0) {
+              workspacePathLookup = buildWorkspacePathLookup([
+                ...targets,
+                ...resolvedWorkspaces,
+              ]);
+            }
+          } catch {
+            workspacePathLookup = buildWorkspacePathLookup(targets);
           }
-        } catch {
-          workspacePathLookup = buildWorkspacePathLookup(targets);
         }
         const uniqueThreadIdsByWorkspace: Record<string, Set<string>> = {};
         const resumeCursorByWorkspace: Record<string, string | null> = {};

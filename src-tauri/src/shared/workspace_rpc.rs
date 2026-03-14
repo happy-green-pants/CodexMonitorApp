@@ -105,6 +105,14 @@ pub(crate) struct OpenWorkspaceInRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct ListDirectoryEntriesRequest {
+    pub(crate) path: Option<String>,
+    pub(crate) limit: Option<u32>,
+    pub(crate) show_hidden: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GetOpenAppIconRequest {
     pub(crate) app_name: String,
 }
