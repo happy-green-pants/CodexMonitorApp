@@ -527,6 +527,7 @@ export function useRemoteThreadLiveConnection({
     let unlistenWindowFocus: (() => void) | null = null;
     let unlistenWindowBlur: (() => void) | null = null;
     let didCleanup = false;
+    const ignoreDetachedEventsUntil = ignoreDetachedEventsUntilRef.current;
 
     const reconnectActiveThread = () => {
       const workspaceId = activeWorkspaceRef.current?.id ?? null;
@@ -613,7 +614,7 @@ export function useRemoteThreadLiveConnection({
       window.removeEventListener("blur", handleBlur);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       desiredSubscriptionKeyRef.current = null;
-      ignoreDetachedEventsUntilRef.current.clear();
+      ignoreDetachedEventsUntil.clear();
       const currentKey = activeSubscriptionKeyRef.current;
       if (currentKey) {
         activeSubscriptionKeyRef.current = null;

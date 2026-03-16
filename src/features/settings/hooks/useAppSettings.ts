@@ -228,6 +228,7 @@ function buildDefaultSettings(): AppSettings {
     workspaceGroups: [],
     openAppTargets: DEFAULT_OPEN_APP_TARGETS,
     selectedOpenAppId: DEFAULT_OPEN_APP_ID,
+    globalWorktreesFolder: null,
   };
 }
 

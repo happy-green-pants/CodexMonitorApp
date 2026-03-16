@@ -229,3 +229,30 @@ button.window-caption-control:focus-visible,
     display: none;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Restore functional spinners — these communicate loading state */
+  .working-spinner,
+  .git-panel-spinner,
+  .commit-message-loader,
+  .commit-button-spinner,
+  .sidebar-refresh-icon.spinning,
+  .worktree-deleting-spinner,
+  .sidebar-account-spinner,
+  .settings-agents-generate-loader,
+  .composer-action-spinner,
+  .compact-codex-refresh-icon.spinning,
+  .home-usage-refresh-icon.spinning {
+    animation-duration: var(--ds-spinner-dur) !important;
+    animation-iteration-count: infinite !important;
+  }
+}

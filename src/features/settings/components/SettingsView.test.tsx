@@ -151,6 +151,7 @@ const baseSettings: AppSettings = {
     },
   ],
   selectedOpenAppId: "vscode",
+  globalWorktreesFolder: null,
 };
 
 const createDoctorResult = () => ({
@@ -689,6 +690,7 @@ describe("SettingsView Environments", () => {
     await waitFor(() => {
       expect(onUpdateWorkspaceSettings).toHaveBeenCalledWith("w1", {
         worktreeSetupScript: "echo updated",
+        worktreesFolder: null,
       });
     });
   });
@@ -704,6 +706,7 @@ describe("SettingsView Environments", () => {
     await waitFor(() => {
       expect(onUpdateWorkspaceSettings).toHaveBeenCalledWith("w1", {
         worktreeSetupScript: null,
+        worktreesFolder: null,
       });
     });
   });

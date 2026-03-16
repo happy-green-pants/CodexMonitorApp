@@ -32,7 +32,7 @@ export function SettingsComposerSection({
     >
       <div className="settings-field">
         <div className="settings-field-label">Follow-up behavior</div>
-        <div className="settings-segmented" aria-label="Follow-up behavior">
+        <div className={`settings-segmented${appSettings.followUpMessageBehavior === "steer" ? " is-second-active" : ""}`} aria-label="Follow-up behavior">
           <label
             className={`settings-segmented-option${
               appSettings.followUpMessageBehavior === "queue" ? " is-active" : ""
