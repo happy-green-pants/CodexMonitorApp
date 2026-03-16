@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
+  AccessMode,
   ModelOption,
   SendMessageResult,
   ServiceTier,
@@ -35,6 +36,7 @@ type UseWorkspaceHomeOptions = {
   activeWorkspace: WorkspaceInfo | null;
   models: ModelOption[];
   selectedModelId: string | null;
+  accessMode: AccessMode;
   effort?: string | null;
   serviceTier?: ServiceTier | null | undefined;
   collaborationMode?: Record<string, unknown> | null;
@@ -45,6 +47,7 @@ type UseWorkspaceHomeOptions = {
       modelId: string | null;
       effort: string | null;
       serviceTier: ServiceTier | null | undefined;
+      accessMode: AccessMode | null;
     },
   ) => void;
   addWorktreeAgent: (
@@ -67,6 +70,7 @@ type UseWorkspaceHomeOptions = {
       effort?: string | null;
       serviceTier?: ServiceTier | null | undefined;
       collaborationMode?: Record<string, unknown> | null;
+      accessMode?: AccessMode;
     },
   ) => Promise<void | SendMessageResult>;
   onWorktreeCreated?: (worktree: WorkspaceInfo, parent: WorkspaceInfo) => Promise<void> | void;
@@ -188,6 +192,7 @@ export function useWorkspaceHome({
   activeWorkspace,
   models,
   selectedModelId,
+  accessMode,
   effort = null,
   serviceTier = undefined,
   collaborationMode = null,
@@ -494,6 +499,7 @@ export function useWorkspaceHome({
             modelId: selectedModelId,
             effort,
             serviceTier,
+            accessMode,
           });
           const localModel = selectedModelId
             ? modelLookup.get(selectedModelId)?.model ?? null
@@ -503,6 +509,7 @@ export function useWorkspaceHome({
             effort,
             serviceTier,
             collaborationMode,
+            accessMode,
           });
           const model =
             selectedModelId ? modelLookup.get(selectedModelId) ?? null : null;
@@ -561,6 +568,7 @@ export function useWorkspaceHome({
                 modelId: selection.modelId,
                 effort,
                 serviceTier,
+                accessMode,
               });
               await sendUserMessageToThread(
                 worktreeWorkspace,
@@ -572,6 +580,7 @@ export function useWorkspaceHome({
                   effort,
                   serviceTier,
                   collaborationMode,
+                  accessMode,
                 },
               );
               instances.push({
@@ -639,6 +648,7 @@ export function useWorkspaceHome({
     setWorkspaceError,
     startThreadForWorkspace,
     updateRunTitle,
+    accessMode,
   ]);
 
   return {

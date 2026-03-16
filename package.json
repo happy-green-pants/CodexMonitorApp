@@ -39,6 +39,7 @@
     "@capacitor/android": "^8.2.0",
     "@capacitor/cli": "^8.2.0",
     "@capacitor/core": "^8.2.0",
+    "@capacitor/local-notifications": "^8.0.2",
     "@pierre/diffs": "^1.0.6",
     "@sentry/react": "^10.36.0",
     "@tanstack/react-virtual": "^3.13.18",

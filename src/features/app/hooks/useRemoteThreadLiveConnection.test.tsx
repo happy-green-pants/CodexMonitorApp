@@ -4,10 +4,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useRemoteThreadLiveConnection } from "./useRemoteThreadLiveConnection";
 
 const appServerListeners = new Set<(event: any) => void>();
-const subscribeAppServerEventsMock = vi.fn((listener: (event: any) => void) => {
+const appServerErrorListeners = new Set<(error: any) => void>();
+const subscribeAppServerEventsMock = vi.fn((
+  listener: (event: any) => void,
+  options?: { onError?: (error: unknown) => void },
+) => {
   appServerListeners.add(listener);
+  if (options?.onError) {
+    appServerErrorListeners.add(options.onError as (error: any) => void);
+  }
   return () => {
     appServerListeners.delete(listener);
+    if (options?.onError) {
+      appServerErrorListeners.delete(options.onError as (error: any) => void);
+    }
   };
 });
 
@@ -16,8 +26,10 @@ const threadLiveUnsubscribeMock = vi.fn().mockResolvedValue(undefined);
 const pushErrorToastMock = vi.fn();
 
 vi.mock("@services/events", () => ({
-  subscribeAppServerEvents: (listener: (event: any) => void) =>
-    subscribeAppServerEventsMock(listener),
+  subscribeAppServerEvents: (
+    listener: (event: any) => void,
+    options?: { onError?: (error: unknown) => void },
+  ) => subscribeAppServerEventsMock(listener, options),
 }));
 
 vi.mock("@services/tauri", () => ({
@@ -58,6 +70,7 @@ describe("useRemoteThreadLiveConnection", () => {
       value: () => hasFocus,
     });
     appServerListeners.clear();
+    appServerErrorListeners.clear();
     subscribeAppServerEventsMock.mockClear();
     threadLiveSubscribeMock.mockClear();
     threadLiveUnsubscribeMock.mockClear();
@@ -66,6 +79,79 @@ describe("useRemoteThreadLiveConnection", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("degrades to polling and shows toast when app-server event stream errors", async () => {
+    const refreshThread = vi.fn().mockResolvedValue(undefined);
+
+    const { result } = renderHook(() =>
+      useRemoteThreadLiveConnection({
+        backendMode: "remote",
+        activeWorkspace: {
+          id: "ws-1",
+          name: "Workspace",
+          path: "/tmp/ws-1",
+          connected: true,
+          settings: { sidebarCollapsed: false },
+        },
+        activeThreadId: "thread-1",
+        activeThreadIsProcessing: true,
+        refreshThread,
+      }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.connectionState).toBe("live");
+
+    await act(async () => {
+      for (const handler of appServerErrorListeners) {
+        handler(new Error("ws closed"));
+      }
+      await Promise.resolve();
+    });
+
+    expect(result.current.connectionState).toBe("polling");
+    expect(pushErrorToastMock).toHaveBeenCalledTimes(1);
+    expect(refreshThread).toHaveBeenCalledTimes(1);
+  });
+
+  it("degrades to polling and refreshes when live stream stalls while processing", async () => {
+    const refreshThread = vi.fn().mockResolvedValue(undefined);
+
+    const { result } = renderHook(() =>
+      useRemoteThreadLiveConnection({
+        backendMode: "remote",
+        activeWorkspace: {
+          id: "ws-1",
+          name: "Workspace",
+          path: "/tmp/ws-1",
+          connected: true,
+          settings: { sidebarCollapsed: false },
+        },
+        activeThreadId: "thread-1",
+        activeThreadIsProcessing: true,
+        refreshThread,
+      }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(result.current.connectionState).toBe("live");
+
+    await act(async () => {
+      vi.advanceTimersByTime(16_000);
+      await Promise.resolve();
+    });
+
+    expect(result.current.connectionState).toBe("polling");
+    expect(pushErrorToastMock).toHaveBeenCalledTimes(1);
+    expect(refreshThread).toHaveBeenCalledTimes(1);
   });
 
   it("does not reconnect during normal idle period without detach signal", async () => {

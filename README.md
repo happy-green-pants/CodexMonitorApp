@@ -44,6 +44,10 @@ CodexMonitor is a Tauri app for orchestrating multiple Codex agents across local
 - Terminal dock with multiple tabs for background commands (experimental).
 - In-app updates with toast-driven download/install, debug panel copy/clear, sound notifications, plus platform-specific window effects (macOS overlay title bar + vibrancy) and a reduced transparency toggle.
 
+## Build Docs
+
+- Android release APK: `docs/build/android-release-apk.md`
+
 ## Requirements
 
 - Node.js + npm

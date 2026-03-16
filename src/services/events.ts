@@ -45,13 +45,31 @@ type BrowserEventEnvelope<T> = {
   error?: { message?: string };
 };
 
-function parseBrowserEventEnvelope<T>(value: unknown): BrowserEventEnvelope<T> | null {
-  const text =
-    typeof value === "string"
-      ? value
-      : value instanceof ArrayBuffer
-        ? new TextDecoder().decode(value)
-        : null;
+async function readBrowserEventText(value: unknown): Promise<string | null> {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (value instanceof ArrayBuffer) {
+    return new TextDecoder().decode(value);
+  }
+  // Some WebViews deliver text frames as Blob.
+  if (typeof Blob !== "undefined" && value instanceof Blob) {
+    try {
+      if (typeof value.text === "function") {
+        return await value.text();
+      }
+      return new TextDecoder().decode(await value.arrayBuffer());
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+async function parseBrowserEventEnvelope<T>(
+  value: unknown,
+): Promise<BrowserEventEnvelope<T> | null> {
+  const text = await readBrowserEventText(value);
   if (!text) {
     return null;
   }
@@ -81,103 +99,159 @@ function createBrowserEventSubscription<T>(
     );
   }
 
-  return new Promise<Unsubscribe>((resolve, reject) => {
-    const socket = new WebSocket(getBrowserRemoteWebSocketUrl(settings));
-    const token = settings.remoteBackendToken?.trim() || null;
-    let settled = false;
-    let authenticated = token == null;
+  return new Promise<Unsubscribe>((resolve) => {
     let closedByClient = false;
+    let socket: WebSocket | null = null;
+    let authenticated = false;
+    let attempt = 0;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let shouldReconnect = true;
+
+    // Keep a stable reference for the lifetime of this subscription.
+    const onError: ((error: unknown) => void) | undefined = options?.onError;
 
     const cleanup = () => {
       closedByClient = true;
+      shouldReconnect = false;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
       try {
-        socket.close();
+        socket?.close();
       } catch {
         // Ignore duplicate close attempts during teardown.
       }
     };
 
-    const rejectOrNotify = (error: Error) => {
-      if (!settled) {
-        settled = true;
-        reject(error);
+    const scheduleReconnect = () => {
+      if (!shouldReconnect || closedByClient) {
         return;
       }
-      if (!closedByClient) {
-        options?.onError?.(error);
+      if (reconnectTimer) {
+        return;
       }
+      // Exponential backoff with a cap; keep it tight so the UI can recover quickly.
+      const baseMs = 250;
+      const maxMs = 10_000;
+      const exponent = Math.min(5, Math.max(0, attempt));
+      const delay = Math.min(maxMs, baseMs * 2 ** exponent);
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, delay);
     };
 
-    socket.onopen = () => {
-      if (!token) {
-        settled = true;
-        resolve(cleanup);
+    const connect = () => {
+      if (!shouldReconnect || closedByClient) {
         return;
       }
-
-      socket.send(
-        JSON.stringify({
-          id: BROWSER_WS_AUTH_REQUEST_ID,
-          method: "auth",
-          params: { token },
-        }),
-      );
-    };
-
-    socket.onmessage = (event) => {
-      const payload = parseBrowserEventEnvelope<T>(event.data);
-      if (!payload) {
-        return;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
       }
 
-      if (!authenticated) {
-        if (payload.error) {
-          rejectOrNotify(
-            new Error(payload.error.message || "Failed to authenticate remote event stream."),
-          );
-          cleanup();
+      // Re-read settings so server/token updates take effect without a full reload.
+      const latestSettings = loadBrowserRemoteSettings();
+      const token = latestSettings.remoteBackendToken?.trim() || null;
+      const url = getBrowserRemoteWebSocketUrl(latestSettings);
+
+      attempt += 1;
+      socket = new WebSocket(url);
+      authenticated = token == null;
+
+      socket.onopen = () => {
+        attempt = 0;
+        if (!token) {
           return;
         }
-        if (payload.id === BROWSER_WS_AUTH_REQUEST_ID && payload.result !== undefined) {
-          authenticated = true;
-          if (!settled) {
-            settled = true;
-            resolve(cleanup);
+        socket?.send(
+          JSON.stringify({
+            id: BROWSER_WS_AUTH_REQUEST_ID,
+            method: "auth",
+            params: { token },
+          }),
+        );
+      };
+
+      socket.onmessage = (event) => {
+        void (async () => {
+          const payload = await parseBrowserEventEnvelope<T>(event.data);
+          if (!payload) {
+            return;
           }
+
+          if (!authenticated) {
+            if (payload.error) {
+              onError?.(
+                new Error(payload.error.message || "Failed to authenticate remote event stream."),
+              );
+              try {
+                socket?.close();
+              } catch {
+                // Ignore.
+              }
+              scheduleReconnect();
+              return;
+            }
+            if (payload.id === BROWSER_WS_AUTH_REQUEST_ID && payload.result !== undefined) {
+              authenticated = true;
+              return;
+            }
+          }
+
+          if (payload.method === eventName) {
+            onEvent(payload.params as T);
+          }
+        })();
+      };
+
+      socket.onerror = () => {
+        if (closedByClient) {
           return;
         }
-      }
+        onError?.(new Error("Unable to connect to the remote event stream."));
+        scheduleReconnect();
+      };
 
-      if (payload.method === eventName) {
-        onEvent(payload.params as T);
-      }
+      socket.onclose = () => {
+        if (closedByClient) {
+          return;
+        }
+        onError?.(
+          new Error(
+            authenticated
+              ? "Remote event stream disconnected."
+              : "Remote event stream closed before authentication completed.",
+          ),
+        );
+        scheduleReconnect();
+      };
     };
 
-    socket.onerror = () => {
-      rejectOrNotify(new Error("Unable to connect to the remote event stream."));
-    };
-
-    socket.onclose = () => {
-      if (closedByClient) {
-        return;
-      }
-      rejectOrNotify(
-        new Error(
-          authenticated
-            ? "Remote event stream disconnected."
-            : "Remote event stream closed before authentication completed.",
-        ),
-      );
-    };
+    // Deliver the cleanup handle immediately so callers can always unsubscribe.
+    resolve(cleanup);
+    connect();
   });
 }
 
 function createEventHub<T>(eventName: string) {
   const listeners = new Set<Listener<T>>();
+  const errorListeners = new Set<(error: unknown) => void>();
   let unlisten: Unsubscribe | null = null;
   let listenPromise: Promise<Unsubscribe> | null = null;
 
-  const start = (options?: SubscriptionOptions) => {
+  const notifyError = (error: unknown) => {
+    for (const handler of errorListeners) {
+      try {
+        handler(error);
+      } catch (listenerError) {
+        console.error(`[events] ${eventName} error listener failed`, listenerError);
+      }
+    }
+  };
+
+  const start = () => {
     if (unlisten || listenPromise) {
       return;
     }
@@ -202,7 +276,11 @@ function createEventHub<T>(eventName: string) {
               }
             }
           },
-          options,
+          {
+            onError: (error) => {
+              notifyError(error);
+            },
+          },
         );
     listenPromise
       .then((handler) => {
@@ -215,7 +293,7 @@ function createEventHub<T>(eventName: string) {
       })
       .catch((error) => {
         listenPromise = null;
-        options?.onError?.(error);
+        notifyError(error);
       });
   };
 
@@ -235,9 +313,15 @@ function createEventHub<T>(eventName: string) {
     options?: SubscriptionOptions,
   ): Unsubscribe => {
     listeners.add(onEvent);
-    start(options);
+    if (options?.onError) {
+      errorListeners.add(options.onError);
+    }
+    start();
     return () => {
       listeners.delete(onEvent);
+      if (options?.onError) {
+        errorListeners.delete(options.onError);
+      }
       if (listeners.size === 0) {
         stop();
       }

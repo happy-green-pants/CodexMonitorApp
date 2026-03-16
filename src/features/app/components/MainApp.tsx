@@ -1245,6 +1245,7 @@ export default function MainApp() {
       resolvedEffort,
       selectedServiceTier,
       collaborationModePayload,
+      accessMode,
     },
     refs: {
       composerInputRef,
@@ -1647,6 +1648,8 @@ export default function MainApp() {
           selectedEffort,
           onSelectEffort: setSelectedEffort,
           reasoningSupported,
+          accessMode,
+          onSelectAccessMode: handleSelectAccessMode,
           error: workspaceRunError,
           isSubmitting: workspaceRunSubmitting,
           activeWorkspaceId,

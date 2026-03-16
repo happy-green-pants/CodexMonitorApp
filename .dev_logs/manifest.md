@@ -2,12 +2,12 @@
 
 ## Active Changelog
 
-- Current: `/.dev_logs/changelog_v6.md`
+- Current: `/.dev_logs/changelog_v8.md`
 
 ## Current Task
 
-- Android（Capacitor）：发送页上传图片无反应
-- Goal: 在 Android App 上点击上传图片能唤起系统选择器并附加图片；失败时给出可见错误提示；不依赖额外存储权限。
+- Android（Capacitor）“AI 回复完成后通知”与通知权限适配
+- Goal: 修复 Android 16 上通知权限入口置灰，并让 Android App 在 AI 回复/turn 完成后能弹出系统通知（Web 端可后置）。
 
 ## Notes
 

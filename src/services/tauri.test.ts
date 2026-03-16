@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import * as notification from "@tauri-apps/plugin-notification";
+import * as capacitorLocalNotifications from "@capacitor/local-notifications";
 import {
   browserRemoteInvoke,
   loadBrowserRemoteSettings,
@@ -77,6 +78,24 @@ vi.mock("@tauri-apps/plugin-notification", () => ({
   isPermissionGranted: vi.fn(),
   requestPermission: vi.fn(),
   sendNotification: vi.fn(),
+}));
+
+const capacitorIsNativePlatformMock = vi.fn(() => false);
+const capacitorGetPlatformMock = vi.fn(() => "web");
+
+vi.mock("@capacitor/core", () => ({
+  Capacitor: {
+    isNativePlatform: () => capacitorIsNativePlatformMock(),
+    getPlatform: () => capacitorGetPlatformMock(),
+  },
+}));
+
+vi.mock("@capacitor/local-notifications", () => ({
+  LocalNotifications: {
+    requestPermissions: vi.fn(),
+    schedule: vi.fn(),
+    createChannel: vi.fn(),
+  },
 }));
 
 vi.mock("./browserRemote", () => ({
@@ -1255,5 +1274,48 @@ describe("tauri invoke wrappers", () => {
       body: "Fallback",
     });
     expect(isPermissionGrantedMock).not.toHaveBeenCalled();
+  });
+
+  it("uses Capacitor LocalNotifications when running in a Capacitor native runtime", async () => {
+    const requestPermissionsMock = vi.mocked(
+      capacitorLocalNotifications.LocalNotifications.requestPermissions,
+    );
+    const createChannelMock = vi.mocked(
+      capacitorLocalNotifications.LocalNotifications.createChannel,
+    );
+    const scheduleMock = vi.mocked(
+      capacitorLocalNotifications.LocalNotifications.schedule,
+    );
+    const sendNotificationMock = vi.mocked(notification.sendNotification);
+
+    capacitorIsNativePlatformMock.mockReturnValue(true);
+    capacitorGetPlatformMock.mockReturnValue("android");
+    requestPermissionsMock.mockResolvedValueOnce({ display: "granted" });
+    createChannelMock.mockResolvedValueOnce();
+    scheduleMock.mockResolvedValueOnce({ notifications: [{ id: 123 }] });
+
+    await sendNotification("Hello", "World", {
+      autoCancel: true,
+      group: "thread/ws-1",
+      extra: { kind: "thread", workspaceId: "ws-1", threadId: "t-1" },
+    });
+
+    expect(requestPermissionsMock).toHaveBeenCalledTimes(1);
+    expect(createChannelMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "codexmonitor" }),
+    );
+    expect(scheduleMock).toHaveBeenCalledWith({
+      notifications: [
+        expect.objectContaining({
+          title: "Hello",
+          body: "World",
+          autoCancel: true,
+          extra: { kind: "thread", workspaceId: "ws-1", threadId: "t-1" },
+          group: "thread/ws-1",
+        }),
+      ],
+    });
+    // The Tauri notification plugin should not be used in Capacitor runtime.
+    expect(sendNotificationMock).not.toHaveBeenCalled();
   });
 });

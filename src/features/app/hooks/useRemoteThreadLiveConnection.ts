@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { subscribeAppServerEvents } from "@services/events";
 import { threadLiveSubscribe, threadLiveUnsubscribe } from "@services/tauri";
+import { pushErrorToast } from "@services/toasts";
 import {
   getAppServerParams,
   getAppServerRawMethod,
@@ -11,6 +12,10 @@ import type { WorkspaceInfo } from "@/types";
 export type RemoteThreadConnectionState = "live" | "polling" | "disconnected";
 
 const SELF_DETACH_IGNORE_WINDOW_MS = 10_000;
+const LIVE_STALL_TIMEOUT_MS = 15_000;
+const LIVE_STALL_COOLDOWN_MS = 30_000;
+const LIVE_STALL_REFRESH_COOLDOWN_MS = 12_000;
+const EVENT_STREAM_TOAST_COOLDOWN_MS = 30_000;
 
 type ReconnectOptions = {
   runResume?: boolean;
@@ -113,6 +118,10 @@ export function useRemoteThreadLiveConnection({
     promise: Promise<boolean>;
   } | null>(null);
   const reconnectSequenceRef = useRef(0);
+  const lastRelevantEventAtMsRef = useRef<number>(Date.now());
+  const lastLiveStallHandledAtMsRef = useRef<number>(0);
+  const lastLiveStallRefreshAtMsRef = useRef<number>(0);
+  const lastEventStreamToastAtMsRef = useRef<number>(0);
 
   useEffect(() => {
     backendModeRef.current = backendMode;
@@ -143,6 +152,50 @@ export function useRemoteThreadLiveConnection({
     connectionStateRef.current = next;
     setConnectionState(next);
   }, []);
+
+  const maybeToastEventStreamIssue = useCallback((title: string, message: string) => {
+    const now = Date.now();
+    if (now - lastEventStreamToastAtMsRef.current < EVENT_STREAM_TOAST_COOLDOWN_MS) {
+      return;
+    }
+    lastEventStreamToastAtMsRef.current = now;
+    pushErrorToast({
+      title,
+      message,
+      durationMs: 6000,
+    });
+  }, []);
+
+  const degradeToPollingBestEffort = useCallback(
+    async (workspaceId: string, threadId: string, reason: "ws-error" | "stall") => {
+      if (!workspaceId || !threadId) {
+        return;
+      }
+      setState("polling");
+      if (reason === "ws-error") {
+        maybeToastEventStreamIssue(
+          "实时事件流已断开",
+          "已自动切换为轮询同步（Polling）。网络恢复后会自动重连。",
+        );
+      } else {
+        maybeToastEventStreamIssue(
+          "实时事件流无响应",
+          "已自动切换为轮询同步（Polling）。",
+        );
+      }
+      const now = Date.now();
+      if (now - lastLiveStallRefreshAtMsRef.current < LIVE_STALL_REFRESH_COOLDOWN_MS) {
+        return;
+      }
+      lastLiveStallRefreshAtMsRef.current = now;
+      try {
+        await Promise.resolve(refreshThreadRef.current(workspaceId, threadId));
+      } catch {
+        // Refresh failures are surfaced elsewhere; avoid toast spam here.
+      }
+    },
+    [maybeToastEventStreamIssue, setState],
+  );
 
   const unsubscribeByKey = useCallback(
     async (key: string) => {
@@ -290,6 +343,7 @@ export function useRemoteThreadLiveConnection({
         ? keyForThread(activeWorkspaceId, activeThreadId)
         : null;
     desiredSubscriptionKeyRef.current = nextKey;
+    lastRelevantEventAtMsRef.current = Date.now();
     const previousKey = activeSubscriptionKeyRef.current;
 
     if (previousKey && previousKey !== nextKey) {
@@ -332,7 +386,8 @@ export function useRemoteThreadLiveConnection({
   ]);
 
   useEffect(() => {
-    const unlisten = subscribeAppServerEvents((event) => {
+    const unlisten = subscribeAppServerEvents(
+      (event) => {
       const method = getAppServerRawMethod(event);
       if (!method) {
         return;
@@ -359,6 +414,7 @@ export function useRemoteThreadLiveConnection({
       if (method === "thread/live_attached") {
         const threadId = extractThreadId(method, params);
         if (threadId === selectedThreadId) {
+          lastRelevantEventAtMsRef.current = Date.now();
           activeSubscriptionKeyRef.current = keyForThread(activeWorkspaceId, threadId);
           setState(connectionStateRef.current === "polling" ? "polling" : "live");
         }
@@ -393,6 +449,7 @@ export function useRemoteThreadLiveConnection({
       if (method === "thread/live_heartbeat") {
         const threadId = extractThreadId(method, params);
         if (threadId === selectedThreadId) {
+          lastRelevantEventAtMsRef.current = Date.now();
           setState("live");
         }
         return;
@@ -405,13 +462,66 @@ export function useRemoteThreadLiveConnection({
       if (threadId !== selectedThreadId) {
         return;
       }
+      lastRelevantEventAtMsRef.current = Date.now();
       setState("live");
-    });
+      },
+      {
+        onError: (error) => {
+          const workspaceId = activeWorkspaceRef.current?.id ?? null;
+          const threadId = activeThreadIdRef.current;
+          if (!workspaceId || !threadId) {
+            return;
+          }
+          console.warn("[remote-live] app-server event stream error", error);
+          void degradeToPollingBestEffort(workspaceId, threadId, "ws-error");
+        },
+      },
+    );
 
     return () => {
       unlisten();
     };
-  }, [reconnectLive, reconcileDisconnectedState, setState]);
+  }, [degradeToPollingBestEffort, reconnectLive, reconcileDisconnectedState, setState]);
+
+  useEffect(() => {
+    if (backendMode !== "remote") {
+      return;
+    }
+    let timer: ReturnType<typeof setInterval> | null = null;
+    timer = setInterval(() => {
+      const workspaceId = activeWorkspaceRef.current?.id ?? null;
+      const threadId = activeThreadIdRef.current;
+      if (!workspaceId || !threadId) {
+        return;
+      }
+      if (!activeThreadIsProcessingRef.current) {
+        return;
+      }
+      if (connectionStateRef.current !== "live") {
+        return;
+      }
+      if (!isDocumentVisible()) {
+        return;
+      }
+
+      const now = Date.now();
+      const lastEventAt = lastRelevantEventAtMsRef.current;
+      if (now - lastEventAt < LIVE_STALL_TIMEOUT_MS) {
+        return;
+      }
+      if (now - lastLiveStallHandledAtMsRef.current < LIVE_STALL_COOLDOWN_MS) {
+        return;
+      }
+      lastLiveStallHandledAtMsRef.current = now;
+      void degradeToPollingBestEffort(workspaceId, threadId, "stall");
+    }, 1000);
+
+    return () => {
+      if (timer) {
+        clearInterval(timer);
+      }
+    };
+  }, [backendMode, degradeToPollingBestEffort]);
 
   useEffect(() => {
     let unlistenWindowFocus: (() => void) | null = null;

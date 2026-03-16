@@ -8,6 +8,7 @@ import {
 } from "react";
 import { convertFileSrc, isTauri } from "@tauri-apps/api/core";
 import type {
+  AccessMode,
   AppOption,
   CustomPromptOption,
   DictationSessionState,
@@ -61,6 +62,8 @@ type WorkspaceHomeProps = {
   selectedEffort: string | null;
   onSelectEffort: (effort: string) => void;
   reasoningSupported: boolean;
+  accessMode: AccessMode;
+  onSelectAccessMode: (mode: AccessMode) => void;
   error: string | null;
   isSubmitting: boolean;
   activeWorkspaceId: string | null;
@@ -124,6 +127,8 @@ export function WorkspaceHome({
   selectedEffort,
   onSelectEffort,
   reasoningSupported,
+  accessMode,
+  onSelectAccessMode,
   error,
   isSubmitting,
   activeWorkspaceId,
@@ -446,6 +451,8 @@ export function WorkspaceHome({
         selectedEffort={selectedEffort}
         onSelectEffort={onSelectEffort}
         reasoningSupported={reasoningSupported}
+        accessMode={accessMode}
+        onSelectAccessMode={onSelectAccessMode}
         isSubmitting={isSubmitting}
       />
 

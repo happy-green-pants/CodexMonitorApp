@@ -10,6 +10,7 @@ import { sendNotification } from "../../../services/tauri";
 import type { DebugEntry } from "../../../types";
 import { isTauri } from "@tauri-apps/api/core";
 import { isAndroidPlatform, isMobilePlatform } from "../../../utils/platformPaths";
+import { Capacitor } from "@capacitor/core";
 
 type Params = {
   enabled?: boolean;
@@ -25,7 +26,10 @@ type Params = {
 };
 
 export function resolveAndroidAgentNotificationOverrides() {
-  const isAndroidApp = isTauri() && isMobilePlatform() && isAndroidPlatform();
+  const isAndroidTauriApp = isTauri() && isMobilePlatform() && isAndroidPlatform();
+  const isAndroidCapacitorApp =
+    Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
+  const isAndroidApp = isAndroidTauriApp || isAndroidCapacitorApp;
   if (!isAndroidApp) {
     return null;
   }

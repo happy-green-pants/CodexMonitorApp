@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isTauri } from "@tauri-apps/api/core";
 import type { Event, EventCallback, UnlistenFn } from "@tauri-apps/api/event";
 import { listen } from "@tauri-apps/api/event";
@@ -42,7 +42,7 @@ class MockWebSocket {
   readyState = 0;
   sent: string[] = [];
   onopen: ((event: { type: string }) => void) | null = null;
-  onmessage: ((event: { data: string }) => void) | null = null;
+  onmessage: ((event: { data: any }) => void) | null = null;
   onerror: ((event: { type: string }) => void) | null = null;
   onclose: ((event: { code: number }) => void) | null = null;
 
@@ -65,7 +65,14 @@ class MockWebSocket {
   }
 
   emitMessage(data: unknown) {
-    this.onmessage?.({ data: JSON.stringify(data) });
+    this.onmessage?.({
+      data:
+        typeof data === "string"
+          ? data
+          : typeof Blob !== "undefined" && data instanceof Blob
+            ? data
+            : JSON.stringify(data),
+    });
   }
 
   emitError() {
@@ -95,6 +102,10 @@ describe("events subscriptions", () => {
     });
     MockWebSocket.instances = [];
     globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("delivers payloads and unsubscribes on cleanup", async () => {
@@ -212,6 +223,7 @@ describe("events subscriptions", () => {
     const cleanup = subscribeAppServerEvents(onEvent);
     const socket = MockWebSocket.instances[0];
 
+    expect(socket).toBeTruthy();
     expect(socket?.url).toBe("wss://codex.example.com/rpc/ws");
 
     socket.emitOpen();
@@ -225,6 +237,7 @@ describe("events subscriptions", () => {
 
     socket.emitMessage({ id: 1, result: { ok: true } });
     await Promise.resolve();
+    await Promise.resolve();
 
     const payload: AppServerEvent = {
       workspace_id: "ws-browser",
@@ -235,11 +248,82 @@ describe("events subscriptions", () => {
       params: payload,
     });
 
+    await Promise.resolve();
+    await Promise.resolve();
     expect(onEvent).toHaveBeenCalledWith(payload);
 
     cleanup();
     await Promise.resolve();
     expect(socket.readyState).toBe(3);
+  });
+
+  it("parses Blob websocket message payloads outside Tauri", async () => {
+    vi.mocked(isTauri).mockReturnValue(false);
+
+    const onEvent = vi.fn();
+    const cleanup = subscribeAppServerEvents(onEvent);
+    const socket = MockWebSocket.instances[0];
+
+    expect(socket).toBeTruthy();
+    socket.emitOpen();
+    socket.emitMessage({ id: 1, result: { ok: true } });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const payload: AppServerEvent = {
+      workspace_id: "ws-blob",
+      message: { method: "thread.updated" },
+    };
+    const blob = new Blob([
+      JSON.stringify({
+        method: "app-server-event",
+        params: payload,
+      }),
+    ]);
+    socket.emitMessage(blob);
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await Promise.resolve();
+
+    expect(onEvent).toHaveBeenCalledWith(payload);
+    cleanup();
+  });
+
+  it("reconnects the browser websocket stream after close once established", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    vi.mocked(isTauri).mockReturnValue(false);
+
+    const onError = vi.fn();
+    const cleanup = subscribeTerminalOutput(() => {}, { onError });
+    const first = MockWebSocket.instances[0];
+
+    expect(first).toBeTruthy();
+    first.emitOpen();
+    first.emitMessage({ id: 1, result: { ok: true } });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    first.emitClose(1006);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(onError).toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(250);
+    const second = MockWebSocket.instances[1];
+    expect(second).toBeTruthy();
+
+    second.emitOpen();
+    expect(second.sent).toEqual([
+      JSON.stringify({
+        id: 1,
+        method: "auth",
+        params: { token: "token-1" },
+      }),
+    ]);
+
+    cleanup();
+    vi.useRealTimers();
   });
 
   it("reports websocket bootstrap errors outside Tauri", async () => {

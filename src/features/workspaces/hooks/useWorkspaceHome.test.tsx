@@ -62,6 +62,7 @@ describe("useWorkspaceHome", () => {
         activeWorkspace: workspace,
         models,
         selectedModelId: null,
+        accessMode: "full-access",
         seedThreadCodexParams,
         addWorktreeAgent,
         connectWorkspace,
@@ -85,12 +86,13 @@ describe("useWorkspaceHome", () => {
       "thread-1",
       "Hello worktree",
       [],
-      expect.objectContaining({ model: "gpt-5.1-max" }),
+      expect.objectContaining({ model: "gpt-5.1-max", accessMode: "full-access" }),
     );
     expect(seedThreadCodexParams).toHaveBeenCalledWith("wt-1", "thread-1", {
       modelId: "id-1",
       effort: null,
       serviceTier: undefined,
+      accessMode: "full-access",
     });
   });
 
@@ -110,6 +112,7 @@ describe("useWorkspaceHome", () => {
         activeWorkspace: workspace,
         models,
         selectedModelId: "id-1",
+        accessMode: "read-only",
         seedThreadCodexParams,
         addWorktreeAgent,
         connectWorkspace,
@@ -128,12 +131,13 @@ describe("useWorkspaceHome", () => {
       "thread-1",
       "",
       ["img-1"],
-      expect.objectContaining({ model: "gpt-5.1-max" }),
+      expect.objectContaining({ model: "gpt-5.1-max", accessMode: "read-only" }),
     );
     expect(seedThreadCodexParams).toHaveBeenCalledWith("ws-1", "thread-1", {
       modelId: "id-1",
       effort: null,
       serviceTier: undefined,
+      accessMode: "read-only",
     });
   });
 
@@ -152,6 +156,7 @@ describe("useWorkspaceHome", () => {
         activeWorkspace: workspace,
         models,
         selectedModelId: null,
+        accessMode: "current",
         addWorktreeAgent,
         connectWorkspace,
         startThreadForWorkspace,
@@ -194,6 +199,7 @@ describe("useWorkspaceHome", () => {
         activeWorkspace: workspace,
         models,
         selectedModelId: null,
+        accessMode: "current",
         addWorktreeAgent,
         connectWorkspace,
         startThreadForWorkspace,
@@ -234,6 +240,7 @@ describe("useWorkspaceHome", () => {
         activeWorkspace: workspace,
         models,
         selectedModelId: "id-1",
+        accessMode: "current",
         addWorktreeAgent,
         connectWorkspace,
         startThreadForWorkspace,
@@ -274,6 +281,7 @@ describe("useWorkspaceHome", () => {
         activeWorkspace: workspace,
         models,
         selectedModelId: null,
+        accessMode: "current",
         addWorktreeAgent,
         connectWorkspace,
         startThreadForWorkspace,

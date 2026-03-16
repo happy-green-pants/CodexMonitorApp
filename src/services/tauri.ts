@@ -1,6 +1,7 @@
 import { invoke as tauriInvoke, isTauri } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type { Options as NotificationOptions } from "@tauri-apps/plugin-notification";
+import { Capacitor } from "@capacitor/core";
 import {
   browserRemoteInvoke,
   loadBrowserRemoteSettings,
@@ -1278,6 +1279,64 @@ export async function sendNotification(
     extra?: Record<string, unknown>;
   },
 ): Promise<void> {
+  // Capacitor (Android/iOS) should use Capacitor's notification APIs.
+  // The Tauri notification plugin doesn't exist in this runtime.
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const { LocalNotifications } = await import(
+        "@capacitor/local-notifications"
+      );
+      const permission = await LocalNotifications.requestPermissions();
+      if (permission.display !== "granted") {
+        console.warn("Notification permission not granted.", { permission });
+        return;
+      }
+
+      // Keep ids within 32-bit int range. Default to current timestamp.
+      const id =
+        typeof options?.id === "number"
+          ? options.id
+          : (Date.now() % 2147483647);
+
+      // On Android 8+, notifications can be tied to channels. If we provide a
+      // channelId that doesn't exist, the notification will not fire.
+      // Best effort: create the channel, and only attach channelId when that
+      // succeeds.
+      let channelId: string | undefined;
+      try {
+        await LocalNotifications.createChannel({
+          id: "codexmonitor",
+          name: "CodexMonitor",
+          description: "CodexMonitor agent notifications",
+          importance: 4,
+        });
+        channelId = "codexmonitor";
+      } catch {
+        channelId = undefined;
+      }
+
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id,
+            title,
+            body,
+            autoCancel: options?.autoCancel ?? true,
+            channelId,
+            group: options?.group,
+            actionTypeId: options?.actionTypeId,
+            sound: options?.sound,
+            extra: options?.extra,
+          },
+        ],
+      });
+      return;
+    } catch (error) {
+      console.warn("Capacitor notification plugin failed.", { error });
+      return;
+    }
+  }
+
   const macosDebugBuild = await invoke<boolean>("is_macos_debug_build").catch(
     () => false,
   );

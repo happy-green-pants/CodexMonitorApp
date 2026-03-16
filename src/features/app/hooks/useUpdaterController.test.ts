@@ -8,6 +8,16 @@ vi.mock("@tauri-apps/api/core", () => ({
   isTauri: () => isTauriMock(),
 }));
 
+const isNativePlatformMock = vi.fn(() => false);
+const getPlatformMock = vi.fn(() => "web");
+
+vi.mock("@capacitor/core", () => ({
+  Capacitor: {
+    isNativePlatform: () => isNativePlatformMock(),
+    getPlatform: () => getPlatformMock(),
+  },
+}));
+
 const globalScope = globalThis as typeof globalThis & { navigator?: Navigator };
 
 function withNavigatorValues(
@@ -71,6 +81,7 @@ function withNavigatorValues(
 describe("resolveAndroidAgentNotificationOverrides", () => {
   it("enables notify-on-every-reply policy on Android Tauri mobile", () => {
     isTauriMock.mockReturnValue(true);
+    isNativePlatformMock.mockReturnValue(false);
 
     withNavigatorValues(
       {
@@ -89,6 +100,7 @@ describe("resolveAndroidAgentNotificationOverrides", () => {
 
   it("does not enable overrides when not running under Tauri", () => {
     isTauriMock.mockReturnValue(false);
+    isNativePlatformMock.mockReturnValue(false);
 
     withNavigatorValues(
       {
@@ -104,6 +116,7 @@ describe("resolveAndroidAgentNotificationOverrides", () => {
 
   it("does not enable overrides on desktop platforms", () => {
     isTauriMock.mockReturnValue(true);
+    isNativePlatformMock.mockReturnValue(false);
 
     withNavigatorValues(
       {
@@ -116,5 +129,15 @@ describe("resolveAndroidAgentNotificationOverrides", () => {
       },
     );
   });
-});
 
+  it("enables notify-on-every-reply policy on Android Capacitor apps", () => {
+    isTauriMock.mockReturnValue(false);
+    isNativePlatformMock.mockReturnValue(true);
+    getPlatformMock.mockReturnValue("android");
+
+    expect(resolveAndroidAgentNotificationOverrides()).toEqual({
+      minDurationMs: 0,
+      forceMuteSubagentNotifications: true,
+    });
+  });
+});

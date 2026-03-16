@@ -50,6 +50,8 @@ describe("WorkspaceHome", () => {
           selectedEffort={null}
           onSelectEffort={() => {}}
           reasoningSupported={false}
+          accessMode="current"
+          onSelectAccessMode={() => {}}
           error={null}
           isSubmitting={false}
           activeWorkspaceId={workspace.id}
@@ -89,4 +91,3 @@ describe("WorkspaceHome", () => {
     }).not.toThrow();
   });
 });
-
