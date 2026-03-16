@@ -4,8 +4,14 @@ import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import { useComposerImages } from "./useComposerImages";
 
+const pushErrorToastMock = vi.fn();
+
 vi.mock("../../../services/tauri", () => ({
   pickImageFiles: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("../../../services/toasts", () => ({
+  pushErrorToast: (input: unknown) => pushErrorToastMock(input),
 }));
 
 type HookResult = ReturnType<typeof useComposerImages>;
@@ -59,6 +65,7 @@ function renderComposerImages(
 
 describe("useComposerImages", () => {
   it("attaches images and deduplicates paths", () => {
+    pushErrorToastMock.mockClear();
     const hook = renderComposerImages({
       activeThreadId: "thread-1",
       activeWorkspaceId: "ws-1",
@@ -84,6 +91,7 @@ describe("useComposerImages", () => {
   });
 
   it("removes images and clears empty drafts", () => {
+    pushErrorToastMock.mockClear();
     const hook = renderComposerImages({
       activeThreadId: "thread-2",
       activeWorkspaceId: "ws-1",
@@ -109,6 +117,7 @@ describe("useComposerImages", () => {
   });
 
   it("switches drafts between thread and workspace", () => {
+    pushErrorToastMock.mockClear();
     const hook = renderComposerImages({
       activeThreadId: "thread-1",
       activeWorkspaceId: "ws-1",
@@ -129,6 +138,30 @@ describe("useComposerImages", () => {
 
     hook.rerender({ activeThreadId: "thread-1", activeWorkspaceId: "ws-1" });
     expect(hook.result.activeImages).toEqual(["/tmp/a.png"]);
+
+    hook.unmount();
+  });
+
+  it("shows an error toast when picking images fails", async () => {
+    pushErrorToastMock.mockClear();
+    const { pickImageFiles } = await import("../../../services/tauri");
+    vi.mocked(pickImageFiles).mockRejectedValueOnce(new Error("picker failed"));
+
+    const hook = renderComposerImages({
+      activeThreadId: "thread-1",
+      activeWorkspaceId: "ws-1",
+    });
+
+    await act(async () => {
+      await hook.result.pickImages();
+    });
+
+    expect(pushErrorToastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "无法打开图片选择器",
+        message: "picker failed",
+      }),
+    );
 
     hook.unmount();
   });

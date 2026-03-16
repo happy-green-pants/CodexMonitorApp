@@ -1,3 +1,4 @@
+/** @vitest-environment jsdom */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
@@ -48,6 +49,7 @@ import {
   tailscaleDaemonStop,
   tailscaleStatus,
   pickWorkspacePaths,
+  pickImageFiles,
   updateAppSettings,
   writeGlobalAgentsMd,
   writeGlobalCodexConfigToml,
@@ -120,6 +122,90 @@ describe("tauri invoke wrappers", () => {
     expect(invokeMock).toHaveBeenCalledWith("add_workspace", {
       path: "/tmp/project",
     });
+  });
+
+  it("picks an image as a data URL in non-Tauri environments", async () => {
+    vi.mocked(isTauri).mockReturnValue(false);
+
+    const restoreFileReader = (() => {
+      const OriginalFileReader = globalThis.FileReader;
+      class MockFileReader {
+        result: string | ArrayBuffer | null = null;
+        onload: null | (() => void) = null;
+        onerror: null | (() => void) = null;
+        readAsDataURL() {
+          this.result = "data:image/png;base64,MOCK";
+          this.onload?.();
+        }
+      }
+      globalThis.FileReader = MockFileReader as unknown as typeof FileReader;
+      return () => {
+        globalThis.FileReader = OriginalFileReader;
+      };
+    })();
+
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation((tagName: string) => {
+        const element = originalCreateElement(tagName);
+        if (tagName.toLowerCase() !== "input") {
+          return element;
+        }
+        const input = element as HTMLInputElement;
+        const file = new File(["data"], "photo.png", { type: "image/png" });
+        Object.defineProperty(input, "files", {
+          value: [file],
+          configurable: true,
+        });
+        vi.spyOn(input, "click").mockImplementation(() => {
+          input.dispatchEvent(new Event("change"));
+        });
+        return input;
+      });
+
+    try {
+      const picked = await pickImageFiles();
+      expect(picked).toEqual(["data:image/png;base64,MOCK"]);
+      expect(vi.mocked(open)).not.toHaveBeenCalled();
+    } finally {
+      createElementSpy.mockRestore();
+      restoreFileReader();
+    }
+  });
+
+  it("returns an empty array when browser image picking is canceled", async () => {
+    vi.mocked(isTauri).mockReturnValue(false);
+
+    vi.useFakeTimers();
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation((tagName: string) => {
+        const element = originalCreateElement(tagName);
+        if (tagName.toLowerCase() !== "input") {
+          return element;
+        }
+        const input = element as HTMLInputElement;
+        Object.defineProperty(input, "files", {
+          value: [],
+          configurable: true,
+        });
+        vi.spyOn(input, "click").mockImplementation(() => {
+          window.dispatchEvent(new Event("focus"));
+        });
+        return input;
+      });
+
+    try {
+      const pending = pickImageFiles();
+      await vi.runAllTimersAsync();
+      await expect(pending).resolves.toEqual([]);
+      expect(vi.mocked(open)).not.toHaveBeenCalled();
+    } finally {
+      createElementSpy.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it("maps payload for addWorkspaceFromGitUrl", async () => {

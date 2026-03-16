@@ -44,6 +44,7 @@ export function useAgentSystemNotifications({
 }: SystemNotificationOptions) {
   const turnStartById = useRef(new Map<string, number>());
   const turnStartByThread = useRef(new Map<string, number>());
+  const turnIdByThread = useRef(new Map<string, string>());
   const lastNotifiedAtByThread = useRef(new Map<string, number>());
   const lastMessageByThread = useRef(new Map<string, string>());
 
@@ -174,8 +175,10 @@ export function useAgentSystemNotifications({
       const threadKey = buildThreadKey(workspaceId, threadId);
       turnStartByThread.current.set(threadKey, startedAt);
       lastMessageByThread.current.delete(threadKey);
+      turnIdByThread.current.delete(threadKey);
       if (turnId) {
         turnStartById.current.set(buildTurnKey(workspaceId, turnId), startedAt);
+        turnIdByThread.current.set(threadKey, turnId);
       }
     },
     [],
@@ -185,6 +188,9 @@ export function useAgentSystemNotifications({
     (workspaceId: string, threadId: string, turnId: string) => {
       const durationMs = consumeDuration(workspaceId, threadId, turnId);
       const threadKey = buildThreadKey(workspaceId, threadId);
+      if (turnIdByThread.current.get(threadKey) === turnId) {
+        turnIdByThread.current.delete(threadKey);
+      }
       if (!shouldNotify(workspaceId, threadId, durationMs, threadKey)) {
         return;
       }
@@ -216,6 +222,9 @@ export function useAgentSystemNotifications({
       }
       const durationMs = consumeDuration(workspaceId, threadId, turnId);
       const threadKey = buildThreadKey(workspaceId, threadId);
+      if (turnIdByThread.current.get(threadKey) === turnId) {
+        turnIdByThread.current.delete(threadKey);
+      }
       if (!shouldNotify(workspaceId, threadId, durationMs, threadKey)) {
         return;
       }
@@ -253,7 +262,12 @@ export function useAgentSystemNotifications({
       if (event.text) {
         lastMessageByThread.current.set(threadKey, event.text);
       }
-      const durationMs = consumeDuration(event.workspaceId, event.threadId, "");
+      recordStartIfMissing(event.workspaceId, event.threadId);
+      const activeTurnId = turnIdByThread.current.get(threadKey) ?? "";
+      const durationMs = consumeDuration(event.workspaceId, event.threadId, activeTurnId);
+      if (activeTurnId) {
+        turnIdByThread.current.delete(threadKey);
+      }
       if (
         !shouldNotify(
           event.workspaceId,

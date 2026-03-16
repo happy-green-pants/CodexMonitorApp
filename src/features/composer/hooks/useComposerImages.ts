@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { pickImageFiles } from "../../../services/tauri";
+import { pushErrorToast } from "../../../services/toasts";
 
 type UseComposerImagesArgs = {
   activeThreadId: string | null;
@@ -34,11 +35,19 @@ export function useComposerImages({
   );
 
   const pickImages = useCallback(async () => {
-    const picked = await pickImageFiles();
-    if (picked.length === 0) {
-      return;
+    try {
+      const picked = await pickImageFiles();
+      if (picked.length === 0) {
+        return;
+      }
+      attachImages(picked);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      pushErrorToast({
+        title: "无法打开图片选择器",
+        message,
+      });
     }
-    attachImages(picked);
   }, [attachImages]);
 
   const removeImage = useCallback(

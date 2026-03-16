@@ -8,6 +8,8 @@ import { playNotificationSound } from "../../../utils/notificationSounds";
 import { subscribeUpdaterCheck } from "../../../services/events";
 import { sendNotification } from "../../../services/tauri";
 import type { DebugEntry } from "../../../types";
+import { isTauri } from "@tauri-apps/api/core";
+import { isAndroidPlatform, isMobilePlatform } from "../../../utils/platformPaths";
 
 type Params = {
   enabled?: boolean;
@@ -21,6 +23,17 @@ type Params = {
   successSoundUrl: string;
   errorSoundUrl: string;
 };
+
+export function resolveAndroidAgentNotificationOverrides() {
+  const isAndroidApp = isTauri() && isMobilePlatform() && isAndroidPlatform();
+  if (!isAndroidApp) {
+    return null;
+  }
+  return {
+    minDurationMs: 0,
+    forceMuteSubagentNotifications: true,
+  } as const;
+}
 
 export function useUpdaterController({
   enabled = true,
@@ -47,6 +60,7 @@ export function useUpdaterController({
   });
   const isWindowFocused = useWindowFocusState();
   const nextTestSoundIsError = useRef(false);
+  const androidAgentNotificationOverrides = resolveAndroidAgentNotificationOverrides();
 
   const subscribeUpdaterCheckEvent = useCallback(
     (handler: () => void) =>
@@ -80,9 +94,13 @@ export function useUpdaterController({
 
   useAgentSystemNotifications({
     enabled: systemNotificationsEnabled,
-    subagentNotificationsEnabled: subagentSystemNotificationsEnabled,
+    subagentNotificationsEnabled:
+      androidAgentNotificationOverrides?.forceMuteSubagentNotifications
+        ? false
+        : subagentSystemNotificationsEnabled,
     isSubagentThread,
     isWindowFocused,
+    minDurationMs: androidAgentNotificationOverrides?.minDurationMs,
     getWorkspaceName,
     onThreadNotificationSent,
     onDebug,

@@ -2,12 +2,12 @@
 
 ## Active Changelog
 
-- Current: `/.dev_logs/changelog_v5.md`
+- Current: `/.dev_logs/changelog_v6.md`
 
 ## Current Task
 
-- Web 远程模式 Workspace 选择崩溃修复
-- Goal: 修复非 Tauri(Web) 运行时选择 workspace 时 `convertFileSrc` 报错导致白屏
+- Android（Capacitor）：发送页上传图片无反应
+- Goal: 在 Android App 上点击上传图片能唤起系统选择器并附加图片；失败时给出可见错误提示；不依赖额外存储权限。
 
 ## Notes
 
@@ -16,3 +16,4 @@
 - `changelog_v1.md` is saturated and archived after the initial Web + Android remote-first implementation batch.
 - `changelog_v2.md` reached >5 modules; start `changelog_v3.md` for ongoing work.
 - `changelog_v3.md` exceeded 100 lines; start `changelog_v4.md` for startup request-storm stabilization work.
+- `changelog_v5.md` exceeded 100 lines; start `changelog_v6.md` for image picker runtime compatibility work.

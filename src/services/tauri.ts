@@ -94,8 +94,17 @@ export async function pickWorkspacePaths(): Promise<string[]> {
 }
 
 export async function pickImageFiles(): Promise<string[]> {
+  if (!isTauri()) {
+    const files = await pickBrowserImageFiles();
+    if (files.length === 0) {
+      return [];
+    }
+    const dataUrls = await readFilesAsDataUrls(files);
+    return dataUrls;
+  }
+
   const selection = await open({
-    multiple: true,
+    multiple: false,
     filters: [
       {
         name: "Images",
@@ -103,10 +112,10 @@ export async function pickImageFiles(): Promise<string[]> {
       },
     ],
   });
-  if (!selection) {
+  if (!selection || Array.isArray(selection)) {
     return [];
   }
-  return Array.isArray(selection) ? selection : [selection];
+  return [selection];
 }
 
 export async function exportMarkdownFile(
@@ -225,6 +234,103 @@ async function fileWrite(
 
 export async function readImageAsDataUrl(path: string): Promise<string> {
   return invoke<string>("read_image_as_data_url", { path });
+}
+
+function pickBrowserImageFiles(): Promise<File[]> {
+  if (typeof document === "undefined") {
+    return Promise.resolve([]);
+  }
+
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.multiple = false;
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    input.style.top = "0";
+
+    const parent = document.body ?? document.documentElement;
+    if (!parent) {
+      resolve([]);
+      return;
+    }
+    parent.appendChild(input);
+
+    let settled = false;
+
+    const cleanup = () => {
+      input.removeEventListener("change", handleChange);
+      input.removeEventListener("cancel", handleCancel);
+      window.removeEventListener("focus", handleFocus);
+      window.clearTimeout(timeoutId);
+      input.remove();
+    };
+
+    const settle = (files: File[]) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      resolve(files);
+    };
+
+    const handleCancel = () => {
+      settle([]);
+    };
+
+    const handleChange = () => {
+      const files = Array.from(input.files ?? []);
+      settle(files.slice(0, 1));
+    };
+
+    const handleFocus = () => {
+      // Some Android WebViews do not fire the `cancel` event. When focus returns
+      // without a `change`, treat it as a cancellation to avoid hanging the call.
+      const maxAttempts = 10;
+      const intervalMs = 100;
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        setTimeout(() => {
+          if (settled) {
+            return;
+          }
+          const files = Array.from(input.files ?? []);
+          if (files.length > 0) {
+            return;
+          }
+          if (attempt === maxAttempts - 1) {
+            settle([]);
+          }
+        }, attempt * intervalMs);
+      }
+    };
+
+    input.addEventListener("change", handleChange);
+    input.addEventListener("cancel", handleCancel);
+    window.addEventListener("focus", handleFocus, { once: true });
+
+    const timeoutId = window.setTimeout(() => {
+      settle([]);
+    }, 10 * 60 * 1000);
+
+    input.click();
+  });
+}
+
+function readFilesAsDataUrls(files: File[]): Promise<string[]> {
+  return Promise.all(
+    files.map(
+      (file) =>
+        new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () =>
+            resolve(typeof reader.result === "string" ? reader.result : "");
+          reader.onerror = () => resolve("");
+          reader.readAsDataURL(file);
+        }),
+    ),
+  ).then((items) => items.filter(Boolean));
 }
 
 export async function readGlobalAgentsMd(): Promise<GlobalAgentsResponse> {

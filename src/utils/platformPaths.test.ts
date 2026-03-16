@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isMobilePlatform } from "./platformPaths";
+import { isAndroidPlatform, isMobilePlatform } from "./platformPaths";
 
 const globalScope = globalThis as typeof globalThis & { navigator?: Navigator };
 
@@ -96,6 +96,34 @@ describe("isMobilePlatform", () => {
       },
       () => {
         expect(isMobilePlatform()).toBe(true);
+      },
+    );
+  });
+});
+
+describe("isAndroidPlatform", () => {
+  it("returns true for Android user agents", () => {
+    withNavigatorValues(
+      {
+        platform: "Linux armv8l",
+        userAgent:
+          "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36",
+      },
+      () => {
+        expect(isAndroidPlatform()).toBe(true);
+      },
+    );
+  });
+
+  it("returns false for desktop user agents", () => {
+    withNavigatorValues(
+      {
+        platform: "MacIntel",
+        userAgent:
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_0) AppleWebKit/537.36",
+      },
+      () => {
+        expect(isAndroidPlatform()).toBe(false);
       },
     );
   });
