@@ -705,6 +705,7 @@ export function ComposerInput({
         </button>
       )}
       <button
+        type="button"
         className={`composer-action composer-action--mic${
           isDictationBusy ? " is-active" : ""
         }${isDictationProcessing ? " is-processing is-stop" : ""}${
@@ -724,9 +725,23 @@ export function ComposerInput({
         )}
       </button>
       <button
+        type="button"
         className={`composer-action${canStop ? " is-stop" : " is-send"}${
           canStop && isProcessing ? " is-loading" : ""
         }`}
+        onPointerDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          try {
+            event.currentTarget.setPointerCapture(event.pointerId);
+          } catch {
+            // Ignore: pointer capture is best-effort.
+          }
+        }}
+        onMouseDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
         onClick={handleActionClick}
         disabled={(disabled && !canStop) || isDictationBusy || (!canStop && !canSend)}
         aria-label={canStop ? "Stop" : sendLabel}

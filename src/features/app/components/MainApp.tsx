@@ -1280,6 +1280,7 @@ export default function MainApp() {
     actions: {
       connectWorkspace,
       startThreadForWorkspace,
+      refreshThread,
       sendUserMessage,
       sendUserMessageToThread,
       seedThreadCodexParams: patchThreadCodexParams,

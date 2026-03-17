@@ -60,6 +60,7 @@ type UseWorkspaceHomeOptions = {
     workspaceId: string,
     options?: { activate?: boolean },
   ) => Promise<string | null>;
+  refreshThread?: (workspaceId: string, threadId: string) => Promise<unknown> | unknown;
   sendUserMessageToThread: (
     workspace: WorkspaceInfo,
     threadId: string,
@@ -200,6 +201,7 @@ export function useWorkspaceHome({
   addWorktreeAgent,
   connectWorkspace,
   startThreadForWorkspace,
+  refreshThread,
   sendUserMessageToThread,
   onWorktreeCreated,
 }: UseWorkspaceHomeOptions) {
@@ -490,7 +492,7 @@ export function useWorkspaceHome({
             await connectWorkspace(activeWorkspace);
           }
           const threadId = await startThreadForWorkspace(activeWorkspace.id, {
-            activate: false,
+            activate: true,
           });
           if (!threadId) {
             throw new Error("Failed to start a local thread.");
@@ -511,6 +513,18 @@ export function useWorkspaceHome({
             collaborationMode,
             accessMode,
           });
+          if (refreshThread) {
+            try {
+              await Promise.resolve(refreshThread(activeWorkspace.id, threadId));
+            } catch {
+              // Best-effort: user can manually refresh via UI if needed.
+            }
+            window.setTimeout(() => {
+              void Promise.resolve(refreshThread(activeWorkspace.id, threadId)).catch(() => {
+                // Ignore: delayed refresh is best-effort.
+              });
+            }, 400);
+          }
           const model =
             selectedModelId ? modelLookup.get(selectedModelId) ?? null : null;
           instances.push({

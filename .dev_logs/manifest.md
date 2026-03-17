@@ -2,12 +2,12 @@
 
 ## Active Changelog
 
-- Current: `/.dev_logs/changelog_v9.md`
+- Current: `/.dev_logs/changelog_v10.md`
 
 ## Current Task
 
-- Android（Capacitor）“AI 回复完成后通知”与通知权限适配
-- Goal: 修复 Android 16 上通知权限入口置灰，并让 Android App 在 AI 回复/turn 完成后能弹出系统通知（Web 端可后置）。
+- 修复 Workspace Home（Projects）发送按钮误切旧会话
+- Goal: 在手机紧凑布局的 Workspace Home 中，无论点击 Send 还是回车发送，都进入刚创建的新 thread，而不是误加载最新旧会话。
 
 ## Notes
 

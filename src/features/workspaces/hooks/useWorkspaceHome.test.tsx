@@ -46,6 +46,40 @@ const models: ModelOption[] = [
 ];
 
 describe("useWorkspaceHome", () => {
+  it("activates the new thread for local runs", async () => {
+    const addWorktreeAgent = vi.fn();
+    const connectWorkspace = vi.fn().mockResolvedValue(undefined);
+    const startThreadForWorkspace = vi.fn().mockResolvedValue("thread-1");
+    const sendUserMessageToThread = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(generateRunMetadata).mockResolvedValue({
+      title: "Local run",
+      worktreeName: "feat/local",
+    });
+
+    const { result } = renderHook(() =>
+      useWorkspaceHome({
+        activeWorkspace: workspace,
+        models,
+        selectedModelId: "id-1",
+        accessMode: "current",
+        addWorktreeAgent,
+        connectWorkspace,
+        startThreadForWorkspace,
+        sendUserMessageToThread,
+      }),
+    );
+
+    act(() => {
+      result.current.setDraft("Hello local");
+    });
+
+    await act(async () => {
+      await result.current.startRun();
+    });
+
+    expect(startThreadForWorkspace).toHaveBeenCalledWith("ws-1", { activate: true });
+  });
+
   it("uses provider model name for worktree runs", async () => {
     const addWorktreeAgent = vi.fn().mockResolvedValue(worktreeWorkspace);
     const connectWorkspace = vi.fn().mockResolvedValue(undefined);

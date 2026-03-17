@@ -74,6 +74,7 @@ type UseMainAppComposerWorkspaceStateArgs = {
       Parameters<typeof useWorkspaceHome>[0]["connectWorkspace"];
     startThreadForWorkspace: Parameters<typeof useComposerController>[0]["startThreadForWorkspace"] &
       Parameters<typeof useWorkspaceHome>[0]["startThreadForWorkspace"];
+    refreshThread: NonNullable<Parameters<typeof useWorkspaceHome>[0]["refreshThread"]>;
     sendUserMessage: Parameters<typeof useComposerController>[0]["sendUserMessage"];
     sendUserMessageToThread: Parameters<typeof useComposerController>[0]["sendUserMessageToThread"] &
       Parameters<typeof useWorkspaceHome>[0]["sendUserMessageToThread"];
@@ -138,6 +139,7 @@ export function useMainAppComposerWorkspaceState({
     addWorktreeAgent,
     connectWorkspace,
     startThreadForWorkspace,
+    refreshThread,
     sendUserMessage,
     sendUserMessageToThread,
     seedThreadCodexParams,
@@ -262,6 +264,7 @@ export function useMainAppComposerWorkspaceState({
     addWorktreeAgent,
     connectWorkspace,
     startThreadForWorkspace,
+    refreshThread,
     sendUserMessageToThread,
     onWorktreeCreated: handleWorktreeCreated,
   });
