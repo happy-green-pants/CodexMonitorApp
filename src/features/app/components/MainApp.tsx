@@ -641,28 +641,6 @@ export default function MainApp() {
     reconnectLive,
     startThreadForWorkspace,
   ]);
-  const {
-    updaterState,
-    startUpdate,
-    dismissUpdate,
-    postUpdateNotice,
-    dismissPostUpdateNotice,
-    handleTestNotificationSound,
-    handleTestSystemNotification,
-  } = useUpdaterController({
-    enabled: updaterEnabled,
-    notificationSoundsEnabled: appSettings.notificationSoundsEnabled,
-    systemNotificationsEnabled: appSettings.systemNotificationsEnabled,
-    subagentSystemNotificationsEnabled:
-      appSettings.subagentSystemNotificationsEnabled,
-    isSubagentThread,
-    getWorkspaceName,
-    onThreadNotificationSent: (workspaceId, threadId) =>
-      recordPendingThreadLinkRef.current(workspaceId, threadId),
-    onDebug: addDebugEntry,
-    successSoundUrl,
-    errorSoundUrl,
-  });
   const gitState = useMainAppGitState({
     activeWorkspace,
     activeWorkspaceId,
@@ -731,6 +709,35 @@ export default function MainApp() {
     pullRequestReviewActions,
     runPullRequestReview,
   } = gitState;
+  const isChatVisibleForNotifications =
+    (isTablet ? tabletTab === "codex" : activeTab === "codex") &&
+    (appSettings.splitChatDiffView || centerMode === "chat");
+  const {
+    updaterState,
+    startUpdate,
+    dismissUpdate,
+    postUpdateNotice,
+    dismissPostUpdateNotice,
+    handleTestNotificationSound,
+    handleTestSystemNotification,
+  } = useUpdaterController({
+    enabled: updaterEnabled,
+    notificationSoundsEnabled: appSettings.notificationSoundsEnabled,
+    systemNotificationsEnabled: appSettings.systemNotificationsEnabled,
+    subagentSystemNotificationsEnabled:
+      appSettings.subagentSystemNotificationsEnabled,
+    notificationIntensity: appSettings.notificationIntensity,
+    activeWorkspaceId,
+    activeThreadId,
+    isChatVisible: isChatVisibleForNotifications,
+    isSubagentThread,
+    getWorkspaceName,
+    onThreadNotificationSent: (workspaceId, threadId) =>
+      recordPendingThreadLinkRef.current(workspaceId, threadId),
+    onDebug: addDebugEntry,
+    successSoundUrl,
+    errorSoundUrl,
+  });
   queueGitStatusRefreshRef.current = queueGitStatusRefresh;
   const { isExpanded: composerEditorExpanded, toggleExpanded: toggleComposerEditorExpanded } =
     useComposerEditorState();
@@ -807,6 +814,10 @@ export default function MainApp() {
     systemNotificationsEnabled: appSettings.systemNotificationsEnabled,
     subagentSystemNotificationsEnabled:
       appSettings.subagentSystemNotificationsEnabled,
+    notificationIntensity: appSettings.notificationIntensity,
+    activeWorkspaceId,
+    activeThreadId,
+    isChatVisible: isChatVisibleForNotifications,
     isSubagentThread,
     approvals,
     userInputRequests,

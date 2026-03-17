@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { WorkspaceInfo } from "../../../types";
 
 export const REMOTE_THREAD_POLL_INTERVAL_MS = 12000;
+export const REMOTE_THREAD_POLL_INTERVAL_MS_WHILE_PROCESSING = 3000;
 
 type UseRemoteThreadRefreshOnFocusOptions = {
   backendMode: string;
@@ -10,6 +11,9 @@ type UseRemoteThreadRefreshOnFocusOptions = {
   activeThreadId: string | null;
   activeThreadIsProcessing?: boolean;
   suspendPolling?: boolean;
+  remoteThreadConnectionState?: "live" | "polling" | "disconnected";
+  pollIntervalMs?: number;
+  pollIntervalMsWhileProcessing?: number;
   reconnectWorkspace?: (workspace: WorkspaceInfo) => Promise<unknown> | unknown;
   refreshThread: (workspaceId: string, threadId: string) => Promise<unknown> | unknown;
 };
@@ -20,6 +24,9 @@ export function useRemoteThreadRefreshOnFocus({
   activeThreadId,
   activeThreadIsProcessing = false,
   suspendPolling = false,
+  remoteThreadConnectionState = "polling",
+  pollIntervalMs = REMOTE_THREAD_POLL_INTERVAL_MS,
+  pollIntervalMsWhileProcessing = REMOTE_THREAD_POLL_INTERVAL_MS_WHILE_PROCESSING,
   reconnectWorkspace,
   refreshThread,
 }: UseRemoteThreadRefreshOnFocusOptions) {
@@ -118,16 +125,15 @@ export function useRemoteThreadRefreshOnFocus({
       if (
         !canRefresh() ||
         suspendPolling ||
-        activeThreadIsProcessing ||
+        remoteThreadConnectionState !== "polling" ||
         !windowFocused ||
         document.visibilityState !== "visible"
       ) {
         return;
       }
-      const pollIntervalMs = REMOTE_THREAD_POLL_INTERVAL_MS;
       pollTimer = setInterval(() => {
         runRefresh();
-      }, pollIntervalMs);
+      }, activeThreadIsProcessing ? pollIntervalMsWhileProcessing : pollIntervalMs);
     };
 
     const handleFocus = () => {
@@ -208,6 +214,9 @@ export function useRemoteThreadRefreshOnFocus({
     activeThreadId,
     activeThreadIsProcessing,
     backendMode,
+    pollIntervalMs,
+    pollIntervalMsWhileProcessing,
+    remoteThreadConnectionState,
     suspendPolling,
     workspaceId,
   ]);

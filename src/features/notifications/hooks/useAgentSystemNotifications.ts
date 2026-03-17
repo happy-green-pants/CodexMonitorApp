@@ -1,15 +1,18 @@
 import { useCallback, useMemo, useRef } from "react";
-import type { DebugEntry } from "../../../types";
+import type { DebugEntry, NotificationIntensity } from "../../../types";
 import { sendNotification } from "../../../services/tauri";
+import { shouldSendNotificationByIntensity } from "../../../utils/notificationPolicy";
 import { useAppServerEvents } from "../../app/hooks/useAppServerEvents";
 
-const DEFAULT_MIN_DURATION_MS = 60_000; // 1 minute
 const MAX_BODY_LENGTH = 200;
 
 type SystemNotificationOptions = {
   enabled: boolean;
   isWindowFocused: boolean;
-  minDurationMs?: number;
+  notificationIntensity: NotificationIntensity;
+  activeWorkspaceId: string | null;
+  activeThreadId: string | null;
+  isChatVisible: boolean;
   subagentNotificationsEnabled?: boolean;
   isSubagentThread?: (workspaceId: string, threadId: string) => boolean;
   getWorkspaceName?: (workspaceId: string) => string | undefined;
@@ -35,7 +38,10 @@ function truncateText(text: string, maxLength: number): string {
 export function useAgentSystemNotifications({
   enabled,
   isWindowFocused,
-  minDurationMs = DEFAULT_MIN_DURATION_MS,
+  notificationIntensity,
+  activeWorkspaceId,
+  activeThreadId,
+  isChatVisible,
   subagentNotificationsEnabled = true,
   isSubagentThread,
   getWorkspaceName,
@@ -134,24 +140,35 @@ export function useAgentSystemNotifications({
       ) {
         return false;
       }
-      if (durationMs < minDurationMs) {
+      const intensityAllows = shouldSendNotificationByIntensity({
+        enabled,
+        intensity: notificationIntensity,
+        isAppForeground: isWindowFocused,
+        isChatVisible,
+        activeWorkspaceId,
+        activeThreadId,
+        eventWorkspaceId: workspaceId,
+        eventThreadId: threadId,
+      });
+      if (!intensityAllows) {
         return false;
       }
-      if (isWindowFocused) {
-        return false;
-      }
+      const spacingMs = notificationIntensity === "high" ? 0 : 1500;
       const lastNotifiedAt = lastNotifiedAtByThread.current.get(threadKey);
-      if (lastNotifiedAt && Date.now() - lastNotifiedAt < 1500) {
+      if (spacingMs > 0 && lastNotifiedAt && Date.now() - lastNotifiedAt < spacingMs) {
         return false;
       }
       lastNotifiedAtByThread.current.set(threadKey, Date.now());
       return true;
     },
     [
+      activeThreadId,
+      activeWorkspaceId,
       enabled,
+      isChatVisible,
       isSubagentThread,
       isWindowFocused,
-      minDurationMs,
+      notificationIntensity,
       subagentNotificationsEnabled,
     ],
   );

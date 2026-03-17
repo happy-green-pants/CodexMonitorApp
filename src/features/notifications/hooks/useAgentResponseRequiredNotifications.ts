@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ApprovalRequest,
   DebugEntry,
+  NotificationIntensity,
   RequestUserInputRequest,
 } from "../../../types";
 import { sendNotification } from "../../../services/tauri";
 import { getApprovalCommandInfo } from "../../../utils/approvalRules";
+import { shouldSendNotificationByIntensity } from "../../../utils/notificationPolicy";
 import { useAppServerEvents } from "../../app/hooks/useAppServerEvents";
 
 const MAX_BODY_LENGTH = 200;
@@ -46,6 +48,10 @@ function isCompletedStatus(status: unknown) {
 type ResponseRequiredNotificationOptions = {
   enabled: boolean;
   isWindowFocused: boolean;
+  notificationIntensity: NotificationIntensity;
+  activeWorkspaceId: string | null;
+  activeThreadId: string | null;
+  isChatVisible: boolean;
   approvals: ApprovalRequest[];
   userInputRequests: RequestUserInputRequest[];
   subagentNotificationsEnabled?: boolean;
@@ -63,6 +69,10 @@ type PendingPlanNotification = {
 export function useAgentResponseRequiredNotifications({
   enabled,
   isWindowFocused,
+  notificationIntensity,
+  activeWorkspaceId,
+  activeThreadId,
+  isChatVisible,
   approvals,
   userInputRequests,
   subagentNotificationsEnabled = true,
@@ -78,35 +88,54 @@ export function useAgentResponseRequiredNotifications({
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [retrySignal, setRetrySignal] = useState(0);
   const [pendingPlansSignal, setPendingPlansSignal] = useState(0);
+  const notificationSpacingMs =
+    notificationIntensity === "high" ? 0 : MIN_NOTIFICATION_SPACING_MS;
 
-  const canNotifyNow = useCallback(() => {
-    if (!enabled) {
-      return false;
-    }
-    if (isWindowFocused) {
-      return false;
+  const policyAllows = useCallback((workspaceId: string, threadId: string | null) => {
+    return shouldSendNotificationByIntensity({
+      enabled,
+      intensity: notificationIntensity,
+      isAppForeground: isWindowFocused,
+      isChatVisible,
+      activeWorkspaceId,
+      activeThreadId,
+      eventWorkspaceId: workspaceId,
+      eventThreadId: threadId,
+    });
+  }, [
+    activeThreadId,
+    activeWorkspaceId,
+    enabled,
+    isChatVisible,
+    isWindowFocused,
+    notificationIntensity,
+  ]);
+
+  const canNotifyNow = useCallback((workspaceId: string, threadId: string | null) => {
+    if (!policyAllows(workspaceId, threadId)) {
+      return { ok: false, shouldRetry: false };
     }
     const lastNotifiedAt = lastNotifiedAtRef.current;
-    if (lastNotifiedAt && Date.now() - lastNotifiedAt < MIN_NOTIFICATION_SPACING_MS) {
-      return false;
+    if (notificationSpacingMs > 0 && lastNotifiedAt && Date.now() - lastNotifiedAt < notificationSpacingMs) {
+      return { ok: false, shouldRetry: true };
     }
     lastNotifiedAtRef.current = Date.now();
-    return true;
-  }, [enabled, isWindowFocused]);
+    return { ok: true, shouldRetry: false };
+  }, [notificationSpacingMs, policyAllows]);
 
   const scheduleRetry = useCallback(() => {
-    if (!enabled || isWindowFocused || retryTimeoutRef.current) {
+    if (!enabled || retryTimeoutRef.current) {
       return;
     }
     const elapsed = lastNotifiedAtRef.current
       ? Date.now() - lastNotifiedAtRef.current
-      : MIN_NOTIFICATION_SPACING_MS;
-    const delay = Math.max(0, MIN_NOTIFICATION_SPACING_MS - elapsed);
+      : notificationSpacingMs;
+    const delay = Math.max(0, notificationSpacingMs - elapsed);
     retryTimeoutRef.current = setTimeout(() => {
       retryTimeoutRef.current = null;
       setRetrySignal((value) => value + 1);
     }, delay);
-  }, [enabled, isWindowFocused]);
+  }, [enabled, notificationSpacingMs]);
 
   const notify = useCallback(
     async (
@@ -211,15 +240,27 @@ export function useAgentResponseRequiredNotifications({
     if (!latestUnnotifiedApproval) {
       return;
     }
-    if (!canNotifyNow()) {
-      scheduleRetry();
-      return;
-    }
-
+    const workspaceId = latestUnnotifiedApproval.workspace_id;
+    const threadId = String(
+      latestUnnotifiedApproval.params?.threadId ??
+        latestUnnotifiedApproval.params?.thread_id ??
+        "",
+    ).trim() || null;
     const approvalKey = buildApprovalKey(
       latestUnnotifiedApproval.workspace_id,
       latestUnnotifiedApproval.request_id,
     );
+
+    const attempt = canNotifyNow(workspaceId, threadId);
+    if (!attempt.ok) {
+      if (attempt.shouldRetry) {
+        scheduleRetry();
+        return;
+      }
+      // Considered: suppressed by policy (e.g. foreground active chat). Do not notify later.
+      notifiedApprovalsRef.current.add(approvalKey);
+      return;
+    }
     notifiedApprovalsRef.current.add(approvalKey);
 
     const workspaceName = getWorkspaceName?.(latestUnnotifiedApproval.workspace_id);
@@ -234,7 +275,7 @@ export function useAgentResponseRequiredNotifications({
     void notify(title, body, {
       kind: "response_required",
       type: "approval",
-      workspaceId: latestUnnotifiedApproval.workspace_id,
+      workspaceId,
       requestId: latestUnnotifiedApproval.request_id,
     });
     scheduleRetry();
@@ -271,15 +312,23 @@ export function useAgentResponseRequiredNotifications({
     if (!latestUnnotifiedQuestion) {
       return;
     }
-    if (!canNotifyNow()) {
-      scheduleRetry();
-      return;
-    }
-
+    const workspaceId = latestUnnotifiedQuestion.workspace_id;
+    const threadId = latestUnnotifiedQuestion.params.thread_id || null;
     const questionKey = buildUserInputKey(
       latestUnnotifiedQuestion.workspace_id,
       latestUnnotifiedQuestion.request_id,
     );
+
+    const attempt = canNotifyNow(workspaceId, threadId);
+    if (!attempt.ok) {
+      if (attempt.shouldRetry) {
+        scheduleRetry();
+        return;
+      }
+      // Considered: suppressed by policy (e.g. foreground active chat). Do not notify later.
+      notifiedUserInputsRef.current.add(questionKey);
+      return;
+    }
     notifiedUserInputsRef.current.add(questionKey);
 
     const workspaceName = getWorkspaceName?.(latestUnnotifiedQuestion.workspace_id);
@@ -291,7 +340,7 @@ export function useAgentResponseRequiredNotifications({
     void notify(title, body, {
       kind: "response_required",
       type: "question",
-      workspaceId: latestUnnotifiedQuestion.workspace_id,
+      workspaceId,
       requestId: latestUnnotifiedQuestion.request_id,
       threadId: latestUnnotifiedQuestion.params.thread_id,
       turnId: latestUnnotifiedQuestion.params.turn_id,
@@ -311,14 +360,28 @@ export function useAgentResponseRequiredNotifications({
     if (!pendingPlanNotificationsRef.current.size) {
       return;
     }
-    if (!canNotifyNow()) {
-      scheduleRetry();
-      return;
-    }
     const next = pendingPlanNotificationsRef.current.entries().next().value as
       | [string, PendingPlanNotification]
       | undefined;
     if (!next) {
+      return;
+    }
+    const [, pendingPeek] = next;
+    const workspaceId = String(pendingPeek.extra.workspaceId ?? "").trim();
+    const threadId = String(pendingPeek.extra.threadId ?? "").trim() || null;
+    if (!workspaceId) {
+      return;
+    }
+    const attempt = canNotifyNow(workspaceId, threadId);
+    if (!attempt.ok) {
+      if (attempt.shouldRetry) {
+        scheduleRetry();
+        return;
+      }
+      // Considered: suppressed by policy. Drop instead of notifying later.
+      pendingPlanNotificationsRef.current.delete(next[0]);
+      notifiedPlanItemsRef.current.add(next[0]);
+      setPendingPlansSignal((value) => value + 1);
       return;
     }
     const [key, pending] = next;
@@ -367,10 +430,18 @@ export function useAgentResponseRequiredNotifications({
         threadId,
         itemId,
       };
-      if (!canNotifyNow()) {
+      const attempt = canNotifyNow(workspaceId, threadId);
+      if (!attempt.ok) {
+        if (!attempt.shouldRetry) {
+          // Considered: suppressed by policy. Do not notify later.
+          notifiedPlanItemsRef.current.add(key);
+          return;
+        }
         pendingPlanNotificationsRef.current.set(key, { title, body, extra });
         setPendingPlansSignal((value) => value + 1);
-        scheduleRetry();
+        if (attempt.shouldRetry) {
+          scheduleRetry();
+        }
         return;
       }
       notifiedPlanItemsRef.current.add(key);

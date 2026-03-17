@@ -113,6 +113,7 @@ const baseSettings: AppSettings = {
   notificationSoundsEnabled: true,
   systemNotificationsEnabled: true,
   subagentSystemNotificationsEnabled: true,
+  notificationIntensity: "high",
   splitChatDiffView: false,
   preloadGitDiffs: true,
   gitDiffIgnoreWhitespaceChanges: false,

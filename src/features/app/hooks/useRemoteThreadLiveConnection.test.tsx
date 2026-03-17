@@ -52,6 +52,11 @@ vi.mock("@tauri-apps/api/window", () => ({
   }),
 }));
 
+const isMobilePlatformMock = vi.fn(() => false);
+vi.mock("@utils/platformPaths", () => ({
+  isMobilePlatform: () => isMobilePlatformMock(),
+}));
+
 describe("useRemoteThreadLiveConnection", () => {
   let visibilityState: DocumentVisibilityState;
   let hasFocus: boolean;
@@ -75,6 +80,8 @@ describe("useRemoteThreadLiveConnection", () => {
     threadLiveSubscribeMock.mockClear();
     threadLiveUnsubscribeMock.mockClear();
     pushErrorToastMock.mockClear();
+    isMobilePlatformMock.mockReset();
+    isMobilePlatformMock.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -117,6 +124,42 @@ describe("useRemoteThreadLiveConnection", () => {
     expect(result.current.connectionState).toBe("polling");
     expect(pushErrorToastMock).toHaveBeenCalledTimes(1);
     expect(refreshThread).toHaveBeenCalledTimes(1);
+  });
+
+  it("degrades to polling without toast on mobile", async () => {
+    isMobilePlatformMock.mockReturnValue(true);
+    const refreshThread = vi.fn().mockResolvedValue(undefined);
+
+    const { result } = renderHook(() =>
+      useRemoteThreadLiveConnection({
+        backendMode: "remote",
+        activeWorkspace: {
+          id: "ws-1",
+          name: "Workspace",
+          path: "/tmp/ws-1",
+          connected: true,
+          settings: { sidebarCollapsed: false },
+        },
+        activeThreadId: "thread-1",
+        activeThreadIsProcessing: true,
+        refreshThread,
+      }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      for (const handler of appServerErrorListeners) {
+        handler(new Error("ws closed"));
+      }
+      await Promise.resolve();
+    });
+
+    expect(result.current.connectionState).toBe("polling");
+    expect(pushErrorToastMock).toHaveBeenCalledTimes(0);
   });
 
   it("degrades to polling and refreshes when live stream stalls while processing", async () => {
@@ -604,6 +647,45 @@ describe("useRemoteThreadLiveConnection", () => {
     expect(threadLiveSubscribeMock).toHaveBeenCalledTimes(2);
     expect(threadLiveUnsubscribeMock).toHaveBeenCalledTimes(1);
     expect(refreshThread).toHaveBeenCalledTimes(0);
+  });
+
+  it("resumes when switching active threads on mobile even with local snapshot", async () => {
+    isMobilePlatformMock.mockReturnValue(true);
+    const refreshThread = vi.fn().mockResolvedValue(undefined);
+    const workspace = {
+      id: "ws-1",
+      name: "Workspace",
+      path: "/tmp/ws-1",
+      connected: true,
+      settings: { sidebarCollapsed: false },
+    };
+
+    const { rerender } = renderHook(
+      ({ threadId }: { threadId: string | null }) =>
+        useRemoteThreadLiveConnection({
+          backendMode: "remote",
+          activeWorkspace: workspace,
+          activeThreadId: threadId,
+          activeThreadHasLocalSnapshot: true,
+          refreshThread,
+        }),
+      {
+        initialProps: { threadId: "thread-1" },
+      },
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      rerender({ threadId: "thread-2" });
+      await Promise.resolve();
+    });
+
+    expect(refreshThread).toHaveBeenCalledTimes(2);
+    expect(refreshThread).toHaveBeenCalledWith("ws-1", "thread-1");
+    expect(refreshThread).toHaveBeenCalledWith("ws-1", "thread-2");
   });
 
   it("resumes when switching to a thread without local snapshot", async () => {

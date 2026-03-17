@@ -275,6 +275,7 @@ describe("useRemoteThreadRefreshOnFocus", () => {
         },
         activeThreadId: "thread-1",
         activeThreadIsProcessing: true,
+        remoteThreadConnectionState: "live",
         refreshThread,
       }),
     );
@@ -308,6 +309,39 @@ describe("useRemoteThreadRefreshOnFocus", () => {
     expect(refreshThread).toHaveBeenCalledTimes(1);
   });
 
+  it("polls while processing when connection state is polling", async () => {
+    const refreshThread = vi.fn().mockResolvedValue(undefined);
+
+    renderHook(() =>
+      useRemoteThreadRefreshOnFocus({
+        backendMode: "remote",
+        activeWorkspace: {
+          id: "ws-1",
+          name: "Workspace",
+          path: "/tmp/ws-1",
+          connected: true,
+          settings: { sidebarCollapsed: false },
+        },
+        activeThreadId: "thread-1",
+        activeThreadIsProcessing: true,
+        remoteThreadConnectionState: "polling",
+        refreshThread,
+      }),
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(2999);
+      await Promise.resolve();
+    });
+    expect(refreshThread).toHaveBeenCalledTimes(0);
+
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+      await Promise.resolve();
+    });
+    expect(refreshThread).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps a low-frequency poll for active remote threads when not processing", async () => {
     const refreshThread = vi.fn().mockResolvedValue(undefined);
 
@@ -323,6 +357,7 @@ describe("useRemoteThreadRefreshOnFocus", () => {
         },
         activeThreadId: "thread-1",
         activeThreadIsProcessing: false,
+        remoteThreadConnectionState: "polling",
         refreshThread,
       }),
     );

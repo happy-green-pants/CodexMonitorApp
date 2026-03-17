@@ -7,6 +7,7 @@ import {
   getAppServerParams,
   getAppServerRawMethod,
 } from "@utils/appServerEvents";
+import { isMobilePlatform } from "@utils/platformPaths";
 import type { WorkspaceInfo } from "@/types";
 
 export type RemoteThreadConnectionState = "live" | "polling" | "disconnected";
@@ -16,6 +17,7 @@ const LIVE_STALL_TIMEOUT_MS = 15_000;
 const LIVE_STALL_COOLDOWN_MS = 30_000;
 const LIVE_STALL_REFRESH_COOLDOWN_MS = 12_000;
 const EVENT_STREAM_TOAST_COOLDOWN_MS = 30_000;
+const CAPACITOR_RESUME_COOLDOWN_MS = 2000;
 
 type ReconnectOptions = {
   runResume?: boolean;
@@ -122,6 +124,7 @@ export function useRemoteThreadLiveConnection({
   const lastLiveStallHandledAtMsRef = useRef<number>(0);
   const lastLiveStallRefreshAtMsRef = useRef<number>(0);
   const lastEventStreamToastAtMsRef = useRef<number>(0);
+  const lastCapacitorResumeAtMsRef = useRef<number>(0);
 
   useEffect(() => {
     backendModeRef.current = backendMode;
@@ -154,6 +157,9 @@ export function useRemoteThreadLiveConnection({
   }, []);
 
   const maybeToastEventStreamIssue = useCallback((title: string, message: string) => {
+    if (isMobilePlatform()) {
+      return;
+    }
     const now = Date.now();
     if (now - lastEventStreamToastAtMsRef.current < EVENT_STREAM_TOAST_COOLDOWN_MS) {
       return;
@@ -182,6 +188,9 @@ export function useRemoteThreadLiveConnection({
           "实时事件流无响应",
           "已自动切换为轮询同步（Polling）。",
         );
+      }
+      if (!isDocumentVisible()) {
+        return;
       }
       const now = Date.now();
       if (now - lastLiveStallRefreshAtMsRef.current < LIVE_STALL_REFRESH_COOLDOWN_MS) {
@@ -255,13 +264,10 @@ export function useRemoteThreadLiveConnection({
         reconnectSequenceRef.current = sequence;
         const workspaceAtStart = activeWorkspaceRef.current;
         const shouldResume = options?.runResume !== false;
-        const shouldKeepLiveState = options?.reason === "thread-switch";
         if (!workspaceAtStart?.connected) {
           setState("disconnected");
-        } else if (shouldResume || !shouldKeepLiveState) {
+        } else if (connectionStateRef.current === "disconnected") {
           setState("polling");
-        } else {
-          setState("live");
         }
 
         try {
@@ -307,11 +313,7 @@ export function useRemoteThreadLiveConnection({
           }
 
           activeSubscriptionKeyRef.current = targetKey;
-          if (shouldResume || !shouldKeepLiveState) {
-            setState("polling");
-          } else {
-            setState("live");
-          }
+          setState("live");
           return true;
         } catch {
           if (sequence === reconnectSequenceRef.current) {
@@ -372,7 +374,7 @@ export function useRemoteThreadLiveConnection({
       return;
     }
     void reconnectLive(parsed.workspaceId, parsed.threadId, {
-      runResume: !activeThreadHasLocalSnapshotRef.current,
+      runResume: isMobilePlatform() || !activeThreadHasLocalSnapshotRef.current,
       reason: "thread-switch",
     });
   }, [
@@ -416,7 +418,7 @@ export function useRemoteThreadLiveConnection({
         if (threadId === selectedThreadId) {
           lastRelevantEventAtMsRef.current = Date.now();
           activeSubscriptionKeyRef.current = keyForThread(activeWorkspaceId, threadId);
-          setState(connectionStateRef.current === "polling" ? "polling" : "live");
+          setState("live");
         }
         return;
       }
@@ -482,6 +484,62 @@ export function useRemoteThreadLiveConnection({
       unlisten();
     };
   }, [degradeToPollingBestEffort, reconnectLive, reconcileDisconnectedState, setState]);
+
+  useEffect(() => {
+    if (!isMobilePlatform()) {
+      return;
+    }
+    let didCleanup = false;
+    let removeListener: (() => void) | null = null;
+    void (async () => {
+      try {
+        const { Capacitor } = await import("@capacitor/core");
+        if (!Capacitor.isNativePlatform()) {
+          return;
+        }
+        const { App } = await import("@capacitor/app");
+        const handler = (state: { isActive: boolean }) => {
+          if (!state.isActive || didCleanup) {
+            return;
+          }
+          const now = Date.now();
+          if (now - lastCapacitorResumeAtMsRef.current < CAPACITOR_RESUME_COOLDOWN_MS) {
+            return;
+          }
+          lastCapacitorResumeAtMsRef.current = now;
+          const workspaceId = activeWorkspaceRef.current?.id ?? null;
+          const threadId = activeThreadIdRef.current;
+          if (!workspaceId || !threadId) {
+            return;
+          }
+          if (!isDocumentVisible()) {
+            return;
+          }
+          void reconnectLive(workspaceId, threadId, {
+            runResume: true,
+            reason: "focus",
+          });
+        };
+        const registration = await App.addListener("appStateChange", handler);
+        if (didCleanup) {
+          registration.remove();
+          return;
+        }
+        removeListener = () => {
+          registration.remove();
+        };
+      } catch {
+        // Ignore: capacitor may be unavailable in non-native runtimes.
+      }
+    })();
+
+    return () => {
+      didCleanup = true;
+      if (removeListener) {
+        removeListener();
+      }
+    };
+  }, [reconnectLive]);
 
   useEffect(() => {
     if (backendMode !== "remote") {

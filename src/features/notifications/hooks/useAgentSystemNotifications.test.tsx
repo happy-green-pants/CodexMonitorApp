@@ -25,7 +25,10 @@ describe("useAgentSystemNotifications", () => {
       useAgentSystemNotifications({
         enabled: true,
         isWindowFocused: false,
-        minDurationMs: 0,
+        notificationIntensity: "high",
+        activeWorkspaceId: null,
+        activeThreadId: null,
+        isChatVisible: false,
         subagentNotificationsEnabled: false,
         isSubagentThread: (_workspaceId, threadId) => threadId === "child-thread",
       }),
@@ -55,7 +58,10 @@ describe("useAgentSystemNotifications", () => {
       useAgentSystemNotifications({
         enabled: true,
         isWindowFocused: false,
-        minDurationMs: 0,
+        notificationIntensity: "high",
+        activeWorkspaceId: null,
+        activeThreadId: null,
+        isChatVisible: false,
         subagentNotificationsEnabled: false,
         isSubagentThread: (_workspaceId, threadId) => threadId === "child-thread",
       }),

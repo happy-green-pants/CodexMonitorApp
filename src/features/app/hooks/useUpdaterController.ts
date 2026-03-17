@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useUpdater } from "../../update/hooks/useUpdater";
 import { useAgentSoundNotifications } from "../../notifications/hooks/useAgentSoundNotifications";
 import { useAgentSystemNotifications } from "../../notifications/hooks/useAgentSystemNotifications";
@@ -6,17 +6,18 @@ import { useWindowFocusState } from "../../layout/hooks/useWindowFocusState";
 import { useTauriEvent } from "./useTauriEvent";
 import { playNotificationSound } from "../../../utils/notificationSounds";
 import { subscribeUpdaterCheck } from "../../../services/events";
-import { sendNotification } from "../../../services/tauri";
-import type { DebugEntry } from "../../../types";
-import { isTauri } from "@tauri-apps/api/core";
-import { isAndroidPlatform, isMobilePlatform } from "../../../utils/platformPaths";
-import { Capacitor } from "@capacitor/core";
+import { ensureNotificationPermission, sendNotification } from "../../../services/tauri";
+import type { DebugEntry, NotificationIntensity } from "../../../types";
 
 type Params = {
   enabled?: boolean;
   notificationSoundsEnabled: boolean;
   systemNotificationsEnabled: boolean;
   subagentSystemNotificationsEnabled: boolean;
+  notificationIntensity: NotificationIntensity;
+  activeWorkspaceId: string | null;
+  activeThreadId: string | null;
+  isChatVisible: boolean;
   isSubagentThread?: (workspaceId: string, threadId: string) => boolean;
   getWorkspaceName?: (workspaceId: string) => string | undefined;
   onThreadNotificationSent?: (workspaceId: string, threadId: string) => void;
@@ -25,25 +26,15 @@ type Params = {
   errorSoundUrl: string;
 };
 
-export function resolveAndroidAgentNotificationOverrides() {
-  const isAndroidTauriApp = isTauri() && isMobilePlatform() && isAndroidPlatform();
-  const isAndroidCapacitorApp =
-    Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
-  const isAndroidApp = isAndroidTauriApp || isAndroidCapacitorApp;
-  if (!isAndroidApp) {
-    return null;
-  }
-  return {
-    minDurationMs: 0,
-    forceMuteSubagentNotifications: true,
-  } as const;
-}
-
 export function useUpdaterController({
   enabled = true,
   notificationSoundsEnabled,
   systemNotificationsEnabled,
   subagentSystemNotificationsEnabled,
+  notificationIntensity,
+  activeWorkspaceId,
+  activeThreadId,
+  isChatVisible,
   isSubagentThread,
   getWorkspaceName,
   onThreadNotificationSent,
@@ -64,7 +55,6 @@ export function useUpdaterController({
   });
   const isWindowFocused = useWindowFocusState();
   const nextTestSoundIsError = useRef(false);
-  const androidAgentNotificationOverrides = resolveAndroidAgentNotificationOverrides();
 
   const subscribeUpdaterCheckEvent = useCallback(
     (handler: () => void) =>
@@ -98,17 +88,24 @@ export function useUpdaterController({
 
   useAgentSystemNotifications({
     enabled: systemNotificationsEnabled,
-    subagentNotificationsEnabled:
-      androidAgentNotificationOverrides?.forceMuteSubagentNotifications
-        ? false
-        : subagentSystemNotificationsEnabled,
+    notificationIntensity,
+    activeWorkspaceId,
+    activeThreadId,
+    isChatVisible,
+    subagentNotificationsEnabled: subagentSystemNotificationsEnabled,
     isSubagentThread,
     isWindowFocused,
-    minDurationMs: androidAgentNotificationOverrides?.minDurationMs,
     getWorkspaceName,
     onThreadNotificationSent,
     onDebug,
   });
+
+  useEffect(() => {
+    if (!systemNotificationsEnabled) {
+      return;
+    }
+    void ensureNotificationPermission();
+  }, [systemNotificationsEnabled]);
 
   const handleTestNotificationSound = useCallback(() => {
     const useError = nextTestSoundIsError.current;

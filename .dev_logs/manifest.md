@@ -2,7 +2,7 @@
 
 ## Active Changelog
 
-- Current: `/.dev_logs/changelog_v8.md`
+- Current: `/.dev_logs/changelog_v9.md`
 
 ## Current Task
 

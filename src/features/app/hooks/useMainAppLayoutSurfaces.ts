@@ -2,7 +2,10 @@ import type { RefObject } from "react";
 import type { AppSettings, ComposerEditorSettings, WorkspaceInfo } from "@/types";
 import type { ThreadState } from "@/features/threads/hooks/useThreadsReducer";
 import type { WorkspaceLaunchScriptsState } from "@app/hooks/useWorkspaceLaunchScripts";
-import { REMOTE_THREAD_POLL_INTERVAL_MS } from "@app/hooks/useRemoteThreadRefreshOnFocus";
+import {
+  REMOTE_THREAD_POLL_INTERVAL_MS,
+  REMOTE_THREAD_POLL_INTERVAL_MS_WHILE_PROCESSING,
+} from "@app/hooks/useRemoteThreadRefreshOnFocus";
 import type { useMainAppComposerWorkspaceState } from "@app/hooks/useMainAppComposerWorkspaceState";
 import type { useMainAppDisplayNodes } from "@app/hooks/useMainAppDisplayNodes";
 import type { useMainAppGitState } from "@app/hooks/useMainAppGitState";
@@ -389,6 +392,11 @@ export function useMainAppLayoutSurfaces({
 }: UseMainAppLayoutSurfacesArgs): LayoutNodesOptions {
   const sidebarRateLimits = activeWorkspace ? activeRateLimits : homeRateLimits;
   const sidebarAccount = activeWorkspace ? activeAccount : homeAccount;
+  const pollingIntervalMs =
+    showMobilePollingFetchStatus &&
+    Boolean(activeThreadId && threadStatusById[activeThreadId]?.isProcessing)
+      ? REMOTE_THREAD_POLL_INTERVAL_MS_WHILE_PROCESSING
+      : REMOTE_THREAD_POLL_INTERVAL_MS;
 
   return {
     primary: {
@@ -480,7 +488,7 @@ export function useMainAppLayoutSurfaces({
           ? threadStatusById[activeThreadId]?.lastDurationMs ?? null
           : null,
         showPollingFetchStatus: showMobilePollingFetchStatus,
-        pollingIntervalMs: REMOTE_THREAD_POLL_INTERVAL_MS,
+        pollingIntervalMs,
       },
       composerProps: composerWorkspaceState.showComposer
         ? {

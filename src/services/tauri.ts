@@ -1267,6 +1267,60 @@ export async function getAppBuildType(): Promise<AppBuildType> {
   return invoke<AppBuildType>("app_build_type");
 }
 
+type NotificationChannel = {
+  id: string;
+  name: string;
+  description: string;
+  importance: 1 | 2 | 3 | 4 | 5;
+};
+
+function notificationChannel(): NotificationChannel {
+  return {
+    id: "codexmonitor",
+    name: "CodexMonitor",
+    description: "CodexMonitor agent notifications",
+    importance: 4,
+  };
+}
+
+export async function ensureNotificationPermission(): Promise<boolean> {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const { LocalNotifications } = await import("@capacitor/local-notifications");
+      const permission = await LocalNotifications.requestPermissions();
+      if (permission.display !== "granted") {
+        console.warn("Notification permission not granted.", { permission });
+        return false;
+      }
+      try {
+        await LocalNotifications.createChannel(notificationChannel());
+      } catch {
+        // Ignore; channel creation is best-effort.
+      }
+      return true;
+    } catch (error) {
+      console.warn("Capacitor notification plugin failed.", { error });
+      return false;
+    }
+  }
+
+  try {
+    const notification = await import("@tauri-apps/plugin-notification");
+    let permissionGranted = await notification.isPermissionGranted();
+    if (!permissionGranted) {
+      const permission = await notification.requestPermission();
+      permissionGranted = permission === "granted";
+    }
+    if (!permissionGranted) {
+      console.warn("Notification permission not granted.");
+    }
+    return permissionGranted;
+  } catch (error) {
+    console.warn("Notification permission check failed.", { error });
+    return false;
+  }
+}
+
 export async function sendNotification(
   title: string,
   body: string,
@@ -1304,12 +1358,7 @@ export async function sendNotification(
       // succeeds.
       let channelId: string | undefined;
       try {
-        await LocalNotifications.createChannel({
-          id: "codexmonitor",
-          name: "CodexMonitor",
-          description: "CodexMonitor agent notifications",
-          importance: 4,
-        });
+        await LocalNotifications.createChannel(notificationChannel());
         channelId = "codexmonitor";
       } catch {
         channelId = undefined;

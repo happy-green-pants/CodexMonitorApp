@@ -1,5 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState } from "react";
+import { isMobilePlatform } from "../../../utils/platformPaths";
 
 export function useWindowFocusState() {
 	const [isFocused, setIsFocused] = useState(() => {
@@ -60,6 +61,49 @@ export function useWindowFocusState() {
 			window.removeEventListener("focus", handleFocus);
 			window.removeEventListener("blur", handleBlur);
 			document.removeEventListener("visibilitychange", handleVisibility);
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!isMobilePlatform()) {
+			return;
+		}
+		let didCleanup = false;
+		let removeListener: (() => void) | null = null;
+
+		void (async () => {
+			try {
+				const { Capacitor } = await import("@capacitor/core");
+				if (!Capacitor.isNativePlatform()) {
+					return;
+				}
+				const { App } = await import("@capacitor/app");
+				const registration = await App.addListener(
+					"appStateChange",
+					(state: { isActive: boolean }) => {
+						if (didCleanup) {
+							return;
+						}
+						setIsFocused(Boolean(state.isActive));
+					},
+				);
+				if (didCleanup) {
+					registration.remove();
+					return;
+				}
+				removeListener = () => {
+					registration.remove();
+				};
+			} catch {
+				// Ignore: capacitor may be unavailable in non-native runtimes.
+			}
+		})();
+
+		return () => {
+			didCleanup = true;
+			if (removeListener) {
+				removeListener();
+			}
 		};
 	}, []);
 

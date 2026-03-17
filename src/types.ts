@@ -207,6 +207,7 @@ export type AccessMode = "read-only" | "current" | "full-access";
 export type ServiceTier = "fast" | "flex";
 export type BackendMode = "local" | "remote";
 export type RemoteBackendProvider = "tcp" | "http";
+export type NotificationIntensity = "high" | "medium" | "low";
 export type RemoteBackendTarget = {
   id: string;
   name: string;
@@ -289,6 +290,7 @@ export type AppSettings = {
   notificationSoundsEnabled: boolean;
   systemNotificationsEnabled: boolean;
   subagentSystemNotificationsEnabled: boolean;
+  notificationIntensity: NotificationIntensity;
   splitChatDiffView: boolean;
   preloadGitDiffs: boolean;
   gitDiffIgnoreWhitespaceChanges: boolean;

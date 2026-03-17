@@ -23,6 +23,7 @@ import { DEFAULT_COMMIT_MESSAGE_PROMPT } from "@utils/commitMessagePrompt";
 const allowedThemes = new Set(["system", "light", "dark", "dim"]);
 const allowedPersonality = new Set(["friendly", "pragmatic"]);
 const allowedFollowUpMessageBehavior = new Set(["queue", "steer"]);
+const allowedNotificationIntensity = new Set(["high", "medium", "low"]);
 const DEFAULT_REMOTE_BACKEND_HOST = "127.0.0.1:4732";
 const DEFAULT_REMOTE_HTTP_ENDPOINT = "https://codex.example.com";
 const DEFAULT_REMOTE_BACKEND_ID = "remote-default";
@@ -199,6 +200,7 @@ function buildDefaultSettings(): AppSettings {
     notificationSoundsEnabled: true,
     systemNotificationsEnabled: true,
     subagentSystemNotificationsEnabled: true,
+    notificationIntensity: "high",
     splitChatDiffView: false,
     preloadGitDiffs: true,
     gitDiffIgnoreWhitespaceChanges: false,
@@ -280,6 +282,11 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
     personality: allowedPersonality.has(settings.personality)
       ? settings.personality
       : "friendly",
+    notificationIntensity: allowedNotificationIntensity.has(
+      settings.notificationIntensity,
+    )
+      ? settings.notificationIntensity
+      : "high",
     followUpMessageBehavior: allowedFollowUpMessageBehavior.has(
       settings.followUpMessageBehavior,
     )

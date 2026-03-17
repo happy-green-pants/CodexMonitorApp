@@ -493,7 +493,7 @@ export function SettingsDisplaySection({
       <div className="settings-subsection-subtitle">Control notification audio alerts.</div>
       <SettingsToggleRow
         title="Notification sounds"
-        subtitle="Play a sound when a long-running agent finishes while the window is unfocused."
+        subtitle="Play a sound when an agent finishes while the window is unfocused."
       >
         <SettingsToggleSwitch
           pressed={appSettings.notificationSoundsEnabled}
@@ -507,7 +507,7 @@ export function SettingsDisplaySection({
       </SettingsToggleRow>
       <SettingsToggleRow
         title="System notifications"
-        subtitle="Show a system notification when a long-running agent finishes while the window is unfocused."
+        subtitle="Show system notifications when agents reply or need attention (see intensity below)."
       >
         <SettingsToggleSwitch
           pressed={appSettings.systemNotificationsEnabled}
@@ -519,6 +519,32 @@ export function SettingsDisplaySection({
           }
         />
       </SettingsToggleRow>
+      <div className="settings-field">
+        <label className="settings-field-label" htmlFor="notification-intensity-select">
+          Notification intensity
+        </label>
+        <select
+          id="notification-intensity-select"
+          className="settings-select"
+          value={appSettings.notificationIntensity}
+          disabled={!appSettings.systemNotificationsEnabled}
+          onChange={(event) =>
+            void onUpdateAppSettings({
+              ...appSettings,
+              notificationIntensity: event.target
+                .value as AppSettings["notificationIntensity"],
+            })
+          }
+        >
+          <option value="high">High — Always notify (all workspaces)</option>
+          <option value="medium">Medium — Suppress only for active chat in foreground</option>
+          <option value="low">Low — Notify only when app is in background</option>
+        </select>
+        <div className="settings-help">
+          High: always notify. Medium: suppress only for the visible active chat. Low:
+          only notify when the app is backgrounded.
+        </div>
+      </div>
       <SettingsToggleRow
         title="Sub-agent notifications"
         subtitle="Include spawned sub-agent threads in system notifications."

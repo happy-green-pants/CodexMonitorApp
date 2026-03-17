@@ -544,6 +544,11 @@ pub(crate) struct AppSettings {
     )]
     pub(crate) subagent_system_notifications_enabled: bool,
     #[serde(
+        default = "default_notification_intensity",
+        rename = "notificationIntensity"
+    )]
+    pub(crate) notification_intensity: String,
+    #[serde(
         default = "default_collaboration_modes_enabled",
         rename = "collaborationModesEnabled"
     )]
@@ -887,6 +892,10 @@ fn default_subagent_system_notifications_enabled() -> bool {
     true
 }
 
+fn default_notification_intensity() -> String {
+    "high".to_string()
+}
+
 fn default_split_chat_diff_view() -> bool {
     false
 }
@@ -1157,6 +1166,7 @@ impl Default for AppSettings {
             notification_sounds_enabled: true,
             system_notifications_enabled: true,
             subagent_system_notifications_enabled: true,
+            notification_intensity: default_notification_intensity(),
             split_chat_diff_view: default_split_chat_diff_view(),
             preload_git_diffs: default_preload_git_diffs(),
             git_diff_ignore_whitespace_changes: default_git_diff_ignore_whitespace_changes(),
@@ -1322,6 +1332,7 @@ mod tests {
         assert!(settings.notification_sounds_enabled);
         assert!(settings.system_notifications_enabled);
         assert!(settings.subagent_system_notifications_enabled);
+        assert_eq!(settings.notification_intensity, "high");
         assert!(!settings.split_chat_diff_view);
         assert!(settings.preload_git_diffs);
         assert!(!settings.git_diff_ignore_whitespace_changes);
