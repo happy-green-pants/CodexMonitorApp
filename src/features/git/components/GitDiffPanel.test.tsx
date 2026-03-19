@@ -95,6 +95,17 @@ describe("GitDiffPanel", () => {
     expect(within(container).queryByRole("button", { name: "Initialize Git" })).toBeNull();
   });
 
+  it("shows a friendly ownership error message", () => {
+    render(
+      <GitDiffPanel
+        {...baseProps}
+        error="repository path '/tmp/repo' is not owned by current user; class=Config (7); code=Owner (-36)"
+      />,
+    );
+
+    expect(screen.getByText(/当前运行 APP 的系统用户与仓库所有者不一致/)).toBeTruthy();
+  });
+
   it("enables commit when message exists and only unstaged changes", () => {
     const onCommit = vi.fn();
     render(

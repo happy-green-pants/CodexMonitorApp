@@ -32,6 +32,7 @@ import {
   type SidebarErrorAction,
 } from "./GitDiffPanelShared";
 import {
+  formatRepoErrorMessage,
   getFileName,
   getGitHubBaseUrl,
   getRelativePathWithin,
@@ -577,7 +578,7 @@ export function GitDiffPanel({
             { key: "commit", message: commitError },
             { key: "sync", message: syncError },
             { key: "commitMessage", message: commitMessageError },
-            { key: "git", message: error },
+            { key: "git", message: formatRepoErrorMessage(error) },
             { key: "worktreeApply", message: worktreeApplyError },
             { key: "gitRootScan", message: gitRootScanError },
           ]

@@ -8,7 +8,7 @@ use tokio::sync::Mutex;
 
 use crate::git_utils::resolve_git_root;
 use crate::shared::process_core::tokio_command;
-use crate::shared::{git_core, worktree_core};
+use crate::shared::{git_core, git_runtime, worktree_core};
 use crate::types::WorkspaceEntry;
 
 pub(crate) fn run_git_command_unit<F, Fut>(
@@ -118,13 +118,15 @@ pub(super) async fn apply_worktree_changes_inner_core(
 
     let git_bin =
         crate::utils::resolve_git_binary().map_err(|e| format!("Failed to run git: {e}"))?;
-    let mut child = tokio_command(git_bin)
+    let mut command = tokio_command(git_bin);
+    command
         .args(["apply", "--3way", "--whitespace=nowarn", "-"])
         .current_dir(&parent_root)
-        .env("PATH", crate::utils::git_env_path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    git_runtime::configure_tokio_git_command(&mut command);
+    let mut child = command
         .spawn()
         .map_err(|e| format!("Failed to run git: {e}"))?;
 

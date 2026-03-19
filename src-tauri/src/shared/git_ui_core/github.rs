@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use git2::Repository;
 use tokio::sync::Mutex;
 
 use crate::git_utils::{parse_github_repo, resolve_git_root};
+use crate::shared::git_runtime::{configure_tokio_git_command, open_repository};
 use crate::shared::process_core::tokio_command;
 use crate::types::{
     GitHubIssue, GitHubIssuesResponse, GitHubPullRequest, GitHubPullRequestComment,
@@ -15,7 +15,7 @@ use crate::utils::normalize_git_path;
 use super::context::workspace_entry_for_id;
 
 fn github_repo_from_path(path: &Path) -> Result<String, String> {
-    let repo = Repository::open(path).map_err(|e| e.to_string())?;
+    let repo = open_repository(path)?;
     let remotes = repo.remotes().map_err(|e| e.to_string())?;
     let name = if remotes.iter().any(|remote| remote == Some("origin")) {
         "origin".to_string()
@@ -149,9 +149,12 @@ pub(super) async fn checkout_github_pull_request_inner(
     let repo_root = resolve_git_root(&entry)?;
     let pr_number_text = pr_number.to_string();
 
-    let output = tokio_command("gh")
+    let mut command = tokio_command("gh");
+    command
         .args(["pr", "checkout", &pr_number_text])
-        .current_dir(&repo_root)
+        .current_dir(&repo_root);
+    configure_tokio_git_command(&mut command);
+    let output = command
         .output()
         .await
         .map_err(|e| format!("Failed to run gh: {e}"))?;
@@ -175,7 +178,8 @@ pub(super) async fn get_github_issues_inner(
     let repo_root = resolve_git_root(&entry)?;
     let repo_name = github_repo_from_path(&repo_root)?;
 
-    let output = tokio_command("gh")
+    let mut command = tokio_command("gh");
+    command
         .args([
             "issue",
             "list",
@@ -186,7 +190,9 @@ pub(super) async fn get_github_issues_inner(
             "--json",
             "number,title,url,updatedAt",
         ])
-        .current_dir(&repo_root)
+        .current_dir(&repo_root);
+    configure_tokio_git_command(&mut command);
+    let output = command
         .output()
         .await
         .map_err(|e| format!("Failed to run gh: {e}"))?;
@@ -203,14 +209,17 @@ pub(super) async fn get_github_issues_inner(
         serde_json::from_slice(&output.stdout).map_err(|e| e.to_string())?;
 
     let search_query = format!("repo:{repo_name} is:issue is:open").replace(' ', "+");
-    let total = match tokio_command("gh")
+    let mut total_command = tokio_command("gh");
+    total_command
         .args([
             "api",
             &format!("/search/issues?q={search_query}"),
             "--jq",
             ".total_count",
         ])
-        .current_dir(&repo_root)
+        .current_dir(&repo_root);
+    configure_tokio_git_command(&mut total_command);
+    let total = match total_command
         .output()
         .await
     {
@@ -232,7 +241,8 @@ pub(super) async fn get_github_pull_requests_inner(
     let repo_root = resolve_git_root(&entry)?;
     let repo_name = github_repo_from_path(&repo_root)?;
 
-    let output = tokio_command("gh")
+    let mut command = tokio_command("gh");
+    command
         .args([
             "pr",
             "list",
@@ -245,7 +255,9 @@ pub(super) async fn get_github_pull_requests_inner(
             "--json",
             "number,title,url,updatedAt,createdAt,body,headRefName,baseRefName,isDraft,author",
         ])
-        .current_dir(&repo_root)
+        .current_dir(&repo_root);
+    configure_tokio_git_command(&mut command);
+    let output = command
         .output()
         .await
         .map_err(|e| format!("Failed to run gh: {e}"))?;
@@ -262,14 +274,17 @@ pub(super) async fn get_github_pull_requests_inner(
         serde_json::from_slice(&output.stdout).map_err(|e| e.to_string())?;
 
     let search_query = format!("repo:{repo_name} is:pr is:open").replace(' ', "+");
-    let total = match tokio_command("gh")
+    let mut total_command = tokio_command("gh");
+    total_command
         .args([
             "api",
             &format!("/search/issues?q={search_query}"),
             "--jq",
             ".total_count",
         ])
-        .current_dir(&repo_root)
+        .current_dir(&repo_root);
+    configure_tokio_git_command(&mut total_command);
+    let total = match total_command
         .output()
         .await
     {
@@ -295,7 +310,8 @@ pub(super) async fn get_github_pull_request_diff_inner(
     let repo_root = resolve_git_root(&entry)?;
     let repo_name = github_repo_from_path(&repo_root)?;
 
-    let output = tokio_command("gh")
+    let mut command = tokio_command("gh");
+    command
         .args([
             "pr",
             "diff",
@@ -305,7 +321,9 @@ pub(super) async fn get_github_pull_request_diff_inner(
             "--color",
             "never",
         ])
-        .current_dir(&repo_root)
+        .current_dir(&repo_root);
+    configure_tokio_git_command(&mut command);
+    let output = command
         .output()
         .await
         .map_err(|e| format!("Failed to run gh: {e}"))?;
@@ -334,9 +352,12 @@ pub(super) async fn get_github_pull_request_comments_inner(
     let comments_endpoint = format!("/repos/{repo_name}/issues/{pr_number}/comments?per_page=30");
     let jq_filter = r#"[.[] | {id, body, createdAt: .created_at, url: .html_url, author: (if .user then {login: .user.login} else null end)}]"#;
 
-    let output = tokio_command("gh")
+    let mut command = tokio_command("gh");
+    command
         .args(["api", &comments_endpoint, "--jq", jq_filter])
-        .current_dir(&repo_root)
+        .current_dir(&repo_root);
+    configure_tokio_git_command(&mut command);
+    let output = command
         .output()
         .await
         .map_err(|e| format!("Failed to run gh: {e}"))?;

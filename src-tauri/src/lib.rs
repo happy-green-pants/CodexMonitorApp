@@ -114,6 +114,11 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            let data_dir = app
+                .path()
+                .app_data_dir()
+                .unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| ".".into()));
+            crate::shared::git_runtime::initialize_app_git_runtime(&data_dir)?;
             let state = state::AppState::load(&app.handle());
             app.manage(state);
             #[cfg(target_os = "macos")]

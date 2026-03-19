@@ -2047,6 +2047,10 @@ fn main() {
             std::process::exit(2);
         }
     };
+    if let Err(err) = shared::git_runtime::initialize_app_git_runtime(&config.data_dir) {
+        eprintln!("failed to initialize app-managed Git runtime: {err}");
+        std::process::exit(2);
+    }
 
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()

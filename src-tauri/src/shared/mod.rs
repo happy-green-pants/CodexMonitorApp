@@ -6,6 +6,7 @@ pub(crate) mod codex_update_core;
 pub(crate) mod config_toml_core;
 pub(crate) mod files_core;
 pub(crate) mod git_core;
+pub(crate) mod git_runtime;
 pub(crate) mod git_rpc;
 pub(crate) mod git_ui_core;
 pub(crate) mod local_usage_core;

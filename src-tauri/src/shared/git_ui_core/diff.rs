@@ -12,9 +12,10 @@ use tokio::sync::Mutex;
 use crate::git_utils::{
     diff_patch_to_string, diff_stats_for_path, image_mime_type, resolve_git_root,
 };
+use crate::shared::git_runtime::{configure_std_git_command, open_repository};
 use crate::shared::process_core::std_command;
 use crate::types::{AppSettings, GitCommitDiff, GitFileDiff, GitFileStatus, WorkspaceEntry};
-use crate::utils::{git_env_path, normalize_git_path, resolve_git_binary};
+use crate::utils::{normalize_git_path, resolve_git_binary};
 
 use super::context::workspace_entry_for_id;
 
@@ -148,17 +149,17 @@ pub(super) fn collect_ignored_paths_with_git(
 
     let repo_root = repo.workdir()?;
     let git_bin = resolve_git_binary().ok()?;
-    let mut child = std_command(git_bin)
+    let mut command = std_command(git_bin);
+    command
         .arg("check-ignore")
         .arg("--stdin")
         .arg("-z")
         .current_dir(repo_root)
-        .env("PATH", git_env_path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?;
+        .stderr(Stdio::null());
+    configure_std_git_command(&mut command);
+    let mut child = command.spawn().ok()?;
 
     let mut stdout = child.stdout.take()?;
     let stdout_thread = std::thread::spawn(move || {
@@ -297,7 +298,7 @@ fn build_combined_diff(repo: &Repository, diff: &git2::Diff) -> String {
 }
 
 pub(super) fn collect_workspace_diff(repo_root: &Path) -> Result<String, String> {
-    let repo = Repository::open(repo_root).map_err(|e| e.to_string())?;
+    let repo = open_repository(repo_root)?;
     let head_tree = repo.head().ok().and_then(|head| head.peel_to_tree().ok());
 
     let mut options = DiffOptions::new();
@@ -337,7 +338,7 @@ pub(super) async fn get_git_status_inner(
 ) -> Result<Value, String> {
     let entry = workspace_entry_for_id(workspaces, &workspace_id).await?;
     let repo_root = resolve_git_root(&entry)?;
-    let repo = Repository::open(&repo_root).map_err(|e| e.to_string())?;
+    let repo = open_repository(&repo_root)?;
 
     let branch_name = repo
         .head()
@@ -475,7 +476,7 @@ pub(super) async fn get_git_diffs_inner(
     };
 
     tokio::task::spawn_blocking(move || {
-        let repo = Repository::open(&repo_root).map_err(|e| e.to_string())?;
+        let repo = open_repository(&repo_root)?;
         let head_tree = repo.head().ok().and_then(|head| head.peel_to_tree().ok());
 
         let mut options = DiffOptions::new();
@@ -629,7 +630,7 @@ pub(super) async fn get_git_commit_diff_inner(
     };
 
     let repo_root = resolve_git_root(&entry)?;
-    let repo = Repository::open(&repo_root).map_err(|e| e.to_string())?;
+    let repo = open_repository(&repo_root)?;
     let oid = git2::Oid::from_str(&sha).map_err(|e| e.to_string())?;
     let commit = repo.find_commit(oid).map_err(|e| e.to_string())?;
     let commit_tree = commit.tree().map_err(|e| e.to_string())?;

@@ -2,25 +2,26 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use git2::{BranchType, Repository, Status, StatusOptions};
+use git2::{BranchType, Status, StatusOptions};
 use serde_json::{json, Value};
 use tokio::sync::Mutex;
 
 use crate::git_utils::{
     checkout_branch, list_git_roots as scan_git_roots, parse_github_repo, resolve_git_root,
 };
+use crate::shared::git_runtime::{configure_tokio_git_command, open_repository};
 use crate::shared::process_core::tokio_command;
 use crate::types::{BranchInfo, WorkspaceEntry};
-use crate::utils::{git_env_path, normalize_git_path, resolve_git_binary};
+use crate::utils::{normalize_git_path, resolve_git_binary};
 
 use super::context::workspace_entry_for_id;
 
 async fn run_git_command(repo_root: &Path, args: &[&str]) -> Result<(), String> {
     let git_bin = resolve_git_binary().map_err(|e| format!("Failed to run git: {e}"))?;
-    let output = tokio_command(git_bin)
-        .args(args)
-        .current_dir(repo_root)
-        .env("PATH", git_env_path())
+    let mut command = tokio_command(git_bin);
+    command.args(args).current_dir(repo_root);
+    configure_tokio_git_command(&mut command);
+    let output = command
         .output()
         .await
         .map_err(|e| format!("Failed to run git: {e}"))?;
@@ -43,9 +44,10 @@ async fn run_git_command(repo_root: &Path, args: &[&str]) -> Result<(), String> 
 }
 
 async fn run_gh_command(repo_root: &Path, args: &[&str]) -> Result<(String, String), String> {
-    let output = tokio_command("gh")
-        .args(args)
-        .current_dir(repo_root)
+    let mut command = tokio_command("gh");
+    command.args(args).current_dir(repo_root);
+    configure_tokio_git_command(&mut command);
+    let output = command
         .output()
         .await
         .map_err(|e| format!("Failed to run gh: {e}"))?;
@@ -184,7 +186,7 @@ pub(super) fn github_repo_names_match(existing: &str, requested: &str) -> bool {
 }
 
 fn git_remote_url(repo_root: &Path, remote_name: &str) -> Option<String> {
-    let repo = Repository::open(repo_root).ok()?;
+    let repo = open_repository(repo_root).ok()?;
     let remote = repo.find_remote(remote_name).ok()?;
     remote.url().map(|url| url.to_string())
 }
@@ -244,7 +246,7 @@ pub(super) fn action_paths_for_file(repo_root: &Path, path: &str) -> Vec<String>
         return Vec::new();
     }
 
-    let repo = match Repository::open(repo_root) {
+    let repo = match open_repository(repo_root) {
         Ok(repo) => repo,
         Err(_) => return vec![target],
     };
@@ -312,7 +314,7 @@ fn parse_upstream_ref(name: &str) -> Option<(String, String)> {
 }
 
 fn upstream_remote_and_branch(repo_root: &Path) -> Result<Option<(String, String)>, String> {
-    let repo = Repository::open(repo_root).map_err(|e| e.to_string())?;
+    let repo = open_repository(repo_root)?;
     let head = match repo.head() {
         Ok(head) => head,
         Err(_) => return Ok(None),
@@ -538,7 +540,7 @@ pub(super) async fn init_git_repo_inner(
     let repo_root = resolve_git_root(&entry)?;
     let branch = validate_branch_name(&branch)?;
 
-    if Repository::open(&repo_root).is_ok() {
+    if open_repository(&repo_root).is_ok() {
         return Ok(json!({ "status": "already_initialized" }));
     }
 
@@ -605,7 +607,7 @@ pub(super) async fn create_github_repo_inner(
         other => return Err(format!("Invalid repo visibility: {other}")),
     };
 
-    let local_repo = Repository::open(&repo_root)
+    let local_repo = open_repository(&repo_root)
         .map_err(|_| "Git is not initialized in this folder yet.".to_string())?;
     let origin_url_before = local_repo
         .find_remote("origin")
@@ -674,7 +676,7 @@ pub(super) async fn create_github_repo_inner(
     let default_branch = if let Some(branch) = branch {
         Some(validate_branch_name(&branch)?)
     } else {
-        let repo = Repository::open(&repo_root).map_err(|e| e.to_string())?;
+        let repo = open_repository(&repo_root)?;
         let head = repo.head().ok();
         let name = head
             .as_ref()
@@ -728,7 +730,7 @@ pub(super) async fn list_git_branches_inner(
 ) -> Result<Value, String> {
     let entry = workspace_entry_for_id(workspaces, &workspace_id).await?;
     let repo_root = resolve_git_root(&entry)?;
-    let repo = Repository::open(&repo_root).map_err(|e| e.to_string())?;
+    let repo = open_repository(&repo_root)?;
     let mut branches = Vec::new();
     let refs = repo
         .branches(Some(BranchType::Local))
@@ -758,7 +760,7 @@ pub(super) async fn checkout_git_branch_inner(
 ) -> Result<(), String> {
     let entry = workspace_entry_for_id(workspaces, &workspace_id).await?;
     let repo_root = resolve_git_root(&entry)?;
-    let repo = Repository::open(&repo_root).map_err(|e| e.to_string())?;
+    let repo = open_repository(&repo_root)?;
     checkout_branch(&repo, &name).map_err(|e| e.to_string())
 }
 
@@ -769,7 +771,7 @@ pub(super) async fn create_git_branch_inner(
 ) -> Result<(), String> {
     let entry = workspace_entry_for_id(workspaces, &workspace_id).await?;
     let repo_root = resolve_git_root(&entry)?;
-    let repo = Repository::open(&repo_root).map_err(|e| e.to_string())?;
+    let repo = open_repository(&repo_root)?;
     let head = repo.head().map_err(|e| e.to_string())?;
     let target = head.peel_to_commit().map_err(|e| e.to_string())?;
     repo.branch(&name, &target, false)

@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
+use crate::shared::git_runtime::configure_tokio_git_command;
 use crate::shared::process_core::tokio_command;
-use crate::utils::{git_env_path, resolve_git_binary};
+use crate::utils::resolve_git_binary;
 
 fn format_git_error(stdout: &[u8], stderr: &[u8]) -> String {
     let stderr = String::from_utf8_lossy(stderr);
@@ -20,10 +21,10 @@ fn format_git_error(stdout: &[u8], stderr: &[u8]) -> String {
 
 pub(crate) async fn run_git_command(repo_path: &PathBuf, args: &[&str]) -> Result<String, String> {
     let git_bin = resolve_git_binary().map_err(|err| format!("Failed to run git: {err}"))?;
-    let output = tokio_command(git_bin)
-        .args(args)
-        .current_dir(repo_path)
-        .env("PATH", git_env_path())
+    let mut command = tokio_command(git_bin);
+    command.args(args).current_dir(repo_path);
+    configure_tokio_git_command(&mut command);
+    let output = command
         .output()
         .await
         .map_err(|err| format!("Failed to run git: {err}"))?;
@@ -49,10 +50,10 @@ pub(crate) async fn run_git_command_bytes(
     args: &[&str],
 ) -> Result<Vec<u8>, String> {
     let git_bin = resolve_git_binary().map_err(|err| format!("Failed to run git: {err}"))?;
-    let output = tokio_command(git_bin)
-        .args(args)
-        .current_dir(repo_path)
-        .env("PATH", git_env_path())
+    let mut command = tokio_command(git_bin);
+    command.args(args).current_dir(repo_path);
+    configure_tokio_git_command(&mut command);
+    let output = command
         .output()
         .await
         .map_err(|err| format!("Failed to run git: {err}"))?;
@@ -64,10 +65,10 @@ pub(crate) async fn run_git_command_bytes(
 
 pub(crate) async fn run_git_diff(repo_path: &PathBuf, args: &[&str]) -> Result<Vec<u8>, String> {
     let git_bin = resolve_git_binary().map_err(|err| format!("Failed to run git: {err}"))?;
-    let output = tokio_command(git_bin)
-        .args(args)
-        .current_dir(repo_path)
-        .env("PATH", git_env_path())
+    let mut command = tokio_command(git_bin);
+    command.args(args).current_dir(repo_path);
+    configure_tokio_git_command(&mut command);
+    let output = command
         .output()
         .await
         .map_err(|err| format!("Failed to run git: {err}"))?;
@@ -83,10 +84,12 @@ pub(crate) fn is_missing_worktree_error(error: &str) -> bool {
 
 pub(crate) async fn git_branch_exists(repo_path: &PathBuf, branch: &str) -> Result<bool, String> {
     let git_bin = resolve_git_binary().map_err(|err| format!("Failed to run git: {err}"))?;
-    let status = tokio_command(git_bin)
+    let mut command = tokio_command(git_bin);
+    command
         .args(["show-ref", "--verify", &format!("refs/heads/{branch}")])
-        .current_dir(repo_path)
-        .env("PATH", git_env_path())
+        .current_dir(repo_path);
+    configure_tokio_git_command(&mut command);
+    let status = command
         .status()
         .await
         .map_err(|err| format!("Failed to run git: {err}"))?;
@@ -95,10 +98,10 @@ pub(crate) async fn git_branch_exists(repo_path: &PathBuf, branch: &str) -> Resu
 
 pub(crate) async fn git_remote_exists(repo_path: &PathBuf, remote: &str) -> Result<bool, String> {
     let git_bin = resolve_git_binary().map_err(|err| format!("Failed to run git: {err}"))?;
-    let status = tokio_command(git_bin)
-        .args(["remote", "get-url", remote])
-        .current_dir(repo_path)
-        .env("PATH", git_env_path())
+    let mut command = tokio_command(git_bin);
+    command.args(["remote", "get-url", remote]).current_dir(repo_path);
+    configure_tokio_git_command(&mut command);
+    let status = command
         .status()
         .await
         .map_err(|err| format!("Failed to run git: {err}"))?;
@@ -111,15 +114,17 @@ pub(crate) async fn git_remote_branch_exists_live(
     branch: &str,
 ) -> Result<bool, String> {
     let git_bin = resolve_git_binary().map_err(|err| format!("Failed to run git: {err}"))?;
-    let output = tokio_command(git_bin)
+    let mut command = tokio_command(git_bin);
+    command
         .args([
             "ls-remote",
             "--heads",
             remote,
             &format!("refs/heads/{branch}"),
         ])
-        .current_dir(repo_path)
-        .env("PATH", git_env_path())
+        .current_dir(repo_path);
+    configure_tokio_git_command(&mut command);
+    let output = command
         .output()
         .await
         .map_err(|err| format!("Failed to run git: {err}"))?;
@@ -137,14 +142,16 @@ pub(crate) async fn git_remote_branch_exists_local(
     branch: &str,
 ) -> Result<bool, String> {
     let git_bin = resolve_git_binary().map_err(|err| format!("Failed to run git: {err}"))?;
-    let status = tokio_command(git_bin)
+    let mut command = tokio_command(git_bin);
+    command
         .args([
             "show-ref",
             "--verify",
             &format!("refs/remotes/{remote}/{branch}"),
         ])
-        .current_dir(repo_path)
-        .env("PATH", git_env_path())
+        .current_dir(repo_path);
+    configure_tokio_git_command(&mut command);
+    let status = command
         .status()
         .await
         .map_err(|err| format!("Failed to run git: {err}"))?;
