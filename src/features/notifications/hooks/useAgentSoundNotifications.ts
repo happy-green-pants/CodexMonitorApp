@@ -160,14 +160,9 @@ export function useAgentSoundNotifications({
 
   const handleAgentMessageCompleted = useCallback(
     (event: { workspaceId: string; threadId: string }) => {
-      const durationMs = consumeDuration(event.workspaceId, event.threadId, "");
-      const threadKey = buildThreadKey(event.workspaceId, event.threadId);
-      if (!shouldPlaySound(durationMs, threadKey)) {
-        return;
-      }
-      playSound(successSoundUrl, "success");
+      recordStartIfMissing(event.workspaceId, event.threadId);
     },
-    [consumeDuration, playSound, shouldPlaySound],
+    [recordStartIfMissing],
   );
 
   const handlers = useMemo(

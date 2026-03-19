@@ -40,3 +40,39 @@ State Summary (from `changelog_v10.md`):
 - **Change**: 运行验证：`npm run test -- src/features/git/utils/repoErrors.test.ts src/features/git/components/GitDiffPanel.test.tsx` 通过；`cargo test --manifest-path src-tauri/Cargo.toml git_runtime -- --nocapture` 通过；`npm run typecheck` 通过；`cargo check --manifest-path src-tauri/Cargo.toml` 通过（存在既有 warning，无新增 error）。
 - **Why**: 按仓库验证矩阵为本次跨前后端修复提供 fresh verification evidence，避免仅凭代码改动声明完成。
 - **Goal**: 证明本次 Git ownership 修复在类型、前端测试、Rust 单测与编译层面均未引入回归。
+---
+### [2026-03-19 18:56] | Agent: Codex (GPT-5)
+- **File**: `src-tauri/target`, `android/.gradle`, `android/build`, `dist`
+- **Change**: 清理本地编译缓存与构建产物：删除 Rust `target`、Android Gradle/build 缓存及前端 `dist`，将仓库占用从约 `9.3G` 降至约 `533M`。
+- **Why**: 用户要求在继续实现前先释放存储空间；本次删除内容均为可再生成的构建缓存，不影响源码。
+- **Goal**: 为后续测试与实现恢复可用磁盘空间，避免缓存挤占工作区容量。
+---
+### [2026-03-19 18:56] | Agent: Codex (GPT-5)
+- **File**: `src/features/notifications/hooks/useAgentSystemNotifications.ts`, `src/features/notifications/hooks/useAgentSoundNotifications.ts`, `src/features/notifications/hooks/useAgentResponseRequiredNotifications.ts`, `src/features/app/hooks/useSystemNotificationThreadLinks.ts`, `src/services/events.ts`, `src/features/app/components/MainApp.tsx`, `src/features/app/orchestration/useThreadOrchestration.ts`
+- **Change**: 开始落地通知细分与模型记忆修复：移除 `agentMessageCompleted` 的系统通知/成功音直发语义，仅保留消息预览缓存；为 approval 通知补齐 `threadId`/`turnId`；新增系统通知点击订阅与通知 metadata 跳转入口；Workspace Home 的模型/effort 选择改走统一持久化 handler；显式选择模型/effort 时始终更新全局 `lastComposer*` 设置。
+- **Why**: 解决“小回复也通知”、点击通知无法稳定跳转会话，以及新建对话回退到旧模型默认值的问题。
+- **Goal**: 让通知只在“需回应”或“回合结束/最终失败”触发，点击通知能打开对应会话，并让新对话继承最近一次显式模型选择。
+---
+### [2026-03-19 18:56] | Agent: Codex (GPT-5)
+- **File**: `src/features/notifications/hooks/useAgentSystemNotifications.test.tsx`, `src/features/notifications/hooks/useAgentResponseRequiredNotifications.test.tsx`, `src/features/app/hooks/useSystemNotificationThreadLinks.test.tsx`, `src/features/app/orchestration/useThreadOrchestration.test.ts`, `src/services/events.test.ts`
+- **Change**: 先补回归测试覆盖：小回复不应提前触发完成通知、approval 通知需携带线程 metadata、通知点击需按 metadata 跳转线程、显式模型/effort 选择需更新全局最近值、系统通知 action 订阅需向前端分发 payload。
+- **Why**: 按 TDD 先用失败测试锁定新行为，避免实现时回归既有通知与模型选择逻辑。
+- **Goal**: 为后续实现提供可执行的行为契约与回归保护。
+---
+### [2026-03-19 19:13] | Agent: Codex (GPT-5)
+- **File**: `/.dev_logs/manifest.md`, `src/services/events.test.ts`, `src/features/models/hooks/useModels.test.tsx`
+- **Change**: 将 manifest 当前任务切换为“通知细分、通知跳转与模型默认记忆修复”；修正系统通知 action 测试以匹配 Tauri `onAction` 实际返回的完整 `Options` payload；修正 `useModels` 测试等待条件，避免在 config model 尚未注入的异步中间态过早断言。
+- **Why**: 当前开发焦点已从上一轮 Git ownership 修复切换；同时全量测试暴露出 2 个验证层问题，其中一个是本轮新增测试断言过严，另一个是既有测试对异步最终态等待不足。
+- **Goal**: 让开发记忆与当前任务一致，并恢复前端测试基线，确保本轮通知与模型记忆改动能够通过完整回归验证。
+---
+### [2026-03-19 19:13] | Agent: Codex (GPT-5)
+- **File**: `src/features/notifications/hooks/useAgentSystemNotifications.ts`, `src/features/notifications/hooks/useAgentSoundNotifications.ts`, `src/features/notifications/hooks/useAgentResponseRequiredNotifications.ts`, `src/features/app/hooks/useSystemNotificationThreadLinks.ts`, `src/services/events.ts`, `src/features/app/components/MainApp.tsx`, `src/features/app/orchestration/useThreadOrchestration.ts`
+- **Change**: 完成通知行为收口与跳转接线：assistant 小回复不再直接触发系统通知/成功音，仅缓存最终预览文本并等待 `turn/completed` 或最终失败；approval 通知附带 `threadId` / `turnId` metadata；新增通知点击 action 订阅并解析 `payload.extra` / 顶层 payload 中的线程信息后跳转；显式切换模型或 reasoning effort 时始终更新全局 `lastComposer*` 设置，并让 Workspace Home 统一走持久化 handler。
+- **Why**: 需要同时解决“AI 小回复也通知”“点击通知偶发不跳转”和“新建对话总回退到 `gpt-5.2-codex`”三个关联问题，且不能破坏现有 turn 完成与线程参数持久化链路。
+- **Goal**: 将通知严格限制在“需回应 + 回合结束/最终失败”，保证通知点击能打开正确会话，并让新对话默认继承最近一次显式模型选择。
+---
+### [2026-03-19 19:13] | Agent: Codex (GPT-5)
+- **File**: `src/features/notifications/hooks/useAgentSystemNotifications.test.tsx`, `src/features/notifications/hooks/useAgentResponseRequiredNotifications.test.tsx`, `src/features/app/hooks/useSystemNotificationThreadLinks.test.tsx`, `src/features/app/orchestration/useThreadOrchestration.test.ts`, `src/services/events.test.ts`, `src/features/models/hooks/useModels.test.tsx`
+- **Change**: 运行验证并补齐通过证据：定向单测 `npm run test -- src/services/events.test.ts`、`npm run test -- src/features/models/hooks/useModels.test.tsx` 通过；`npm run typecheck` 通过；`npm run test` 全量通过（`142` files, `989` tests）。另记录全量测试中仍有既有 `act(...)` 与预期错误日志输出的 stderr 警告，但不影响退出码。
+- **Why**: 需要用 fresh verification evidence 证明本轮通知/跳转/模型记忆修改没有引入回归，并明确区分“测试通过”与“测试 stderr 噪声”。
+- **Goal**: 为最终交付提供完整、可复现的验证结论。

@@ -142,6 +142,49 @@ describe("useAgentResponseRequiredNotifications", () => {
     });
   });
 
+  it("includes thread metadata for approval notifications when available", async () => {
+    const approvals: ApprovalRequest[] = [
+      {
+        workspace_id: "ws-1",
+        request_id: 9,
+        method: "workspace/requestApproval",
+        params: {
+          command: "npm run lint",
+          threadId: "thread-approval",
+          turnId: "turn-approval",
+        },
+      },
+    ];
+
+    renderHook(() =>
+      useAgentResponseRequiredNotifications({
+        enabled: true,
+        isWindowFocused: false,
+        notificationIntensity: "medium",
+        activeWorkspaceId: null,
+        activeThreadId: null,
+        isChatVisible: false,
+        approvals,
+        userInputRequests: [],
+      }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(sendNotification).mock.calls[0]?.[2]).toMatchObject({
+      extra: {
+        type: "approval",
+        workspaceId: "ws-1",
+        requestId: 9,
+        threadId: "thread-approval",
+        turnId: "turn-approval",
+      },
+    });
+  });
+
   it("notifies each pending question request without suppressing older ones", async () => {
     const userInputRequests: RequestUserInputRequest[] = [
       {

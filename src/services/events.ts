@@ -1,5 +1,10 @@
 import { isTauri } from "@tauri-apps/api/core";
+import type { PluginListener } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import {
+  onAction as onNotificationAction,
+  type Options as NotificationOptions,
+} from "@tauri-apps/plugin-notification";
 import {
   getBrowserRemoteWebSocketUrl,
   loadBrowserRemoteSettings,
@@ -414,6 +419,50 @@ export function subscribeTrayOpenThread(
   return trayOpenThreadHub.subscribe((payload) => {
     onEvent(payload);
   }, options);
+}
+
+export function subscribeSystemNotificationActions(
+  onEvent: (payload: NotificationOptions) => void,
+  options?: SubscriptionOptions,
+): Unsubscribe {
+  if (!isTauri()) {
+    return () => {};
+  }
+
+  let listener: PluginListener | null = null;
+  let closed = false;
+  const safeUnregister = (registered: PluginListener | null) => {
+    if (!registered) {
+      return;
+    }
+    try {
+      const result = registered.unregister();
+      if (result && typeof (result as Promise<void>).catch === "function") {
+        void (result as Promise<void>).catch(() => {});
+      }
+    } catch {
+      // Ignore cleanup errors during listener teardown.
+    }
+  };
+
+  void onNotificationAction((payload) => {
+    onEvent(payload);
+  })
+    .then((registered) => {
+      if (closed) {
+        safeUnregister(registered);
+        return;
+      }
+      listener = registered;
+    })
+    .catch((error) => {
+      options?.onError?.(error);
+    });
+
+  return () => {
+    closed = true;
+    safeUnregister(listener);
+  };
 }
 
 export function subscribeMenuNewAgent(

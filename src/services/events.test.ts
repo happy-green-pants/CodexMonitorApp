@@ -2,6 +2,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 import { isTauri } from "@tauri-apps/api/core";
 import type { Event, EventCallback, UnlistenFn } from "@tauri-apps/api/event";
 import { listen } from "@tauri-apps/api/event";
+import * as notification from "@tauri-apps/plugin-notification";
+import type { Options as NotificationOptions } from "@tauri-apps/plugin-notification";
 import type { AppServerEvent } from "../types";
 import {
   getBrowserRemoteWebSocketUrl,
@@ -12,6 +14,7 @@ import {
   subscribeMenuCycleCollaborationMode,
   subscribeMenuCycleModel,
   subscribeMenuNewAgent,
+  subscribeSystemNotificationActions,
   subscribeTerminalOutput,
 } from "./events";
 
@@ -21,6 +24,10 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(),
+}));
+
+vi.mock("@tauri-apps/plugin-notification", () => ({
+  onAction: vi.fn(),
 }));
 
 vi.mock("./browserRemote", () => ({
@@ -339,6 +346,37 @@ describe("events subscriptions", () => {
 
     expect(onError).toHaveBeenCalled();
     cleanup();
+  });
+
+  it("delivers system notification action events in Tauri", async () => {
+    vi.mocked(isTauri).mockReturnValue(true);
+    const unregister = vi.fn();
+    vi.mocked(notification.onAction).mockImplementationOnce(
+      async (handler: (payload: NotificationOptions) => void) => {
+        handler({
+          title: "Thread ready",
+          extra: { workspaceId: "ws-1", threadId: "thread-1" },
+        });
+        return { unregister } as unknown as Awaited<
+          ReturnType<typeof notification.onAction>
+        >;
+      },
+    );
+
+    const onEvent = vi.fn();
+    const cleanup = subscribeSystemNotificationActions(onEvent);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        extra: { workspaceId: "ws-1", threadId: "thread-1" },
+      }),
+    );
+
+    cleanup();
+    await Promise.resolve();
   });
 });
 

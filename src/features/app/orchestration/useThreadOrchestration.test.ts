@@ -21,6 +21,7 @@ type SyncParams = Parameters<typeof useThreadCodexSyncOrchestration>[0];
 function makeSelectionParams(): SelectionParams & {
   persistThreadCodexParams: ReturnType<typeof vi.fn>;
   setSelectedCodexArgsOverride: ReturnType<typeof vi.fn>;
+  activeThreadIdRef: MutableRefObject<string | null>;
 } {
   const setAppSettings = vi.fn() as unknown as Dispatch<SetStateAction<AppSettings>>;
   const setAccessMode = vi.fn() as unknown as Dispatch<SetStateAction<AccessMode>>;
@@ -32,7 +33,6 @@ function makeSelectionParams(): SelectionParams & {
     appSettingsLoading: false,
     setAppSettings,
     queueSaveSettings: vi.fn(async () => undefined),
-    activeThreadIdRef,
     setSelectedModelId: vi.fn(),
     setSelectedEffort: vi.fn(),
     setSelectedServiceTier: vi.fn(),
@@ -40,6 +40,7 @@ function makeSelectionParams(): SelectionParams & {
     setAccessMode,
     setSelectedCodexArgsOverride,
     persistThreadCodexParams,
+    activeThreadIdRef,
   };
 }
 
@@ -94,6 +95,38 @@ function makeSyncParams(
 describe("useThreadSelectionHandlersOrchestration codex args selection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("persists the last selected model globally even when a thread is active", () => {
+    const params = makeSelectionParams();
+    params.activeThreadIdRef.current = "thread-1";
+    const { result } = renderHook(() => useThreadSelectionHandlersOrchestration(params));
+
+    act(() => {
+      result.current.handleSelectModel("gpt-5.4");
+    });
+
+    expect(params.persistThreadCodexParams).toHaveBeenCalledWith({
+      modelId: "gpt-5.4",
+    });
+    expect(params.setSelectedModelId).toHaveBeenCalledWith("gpt-5.4");
+    expect(params.setAppSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists the last selected reasoning effort globally even when a thread is active", () => {
+    const params = makeSelectionParams();
+    params.activeThreadIdRef.current = "thread-1";
+    const { result } = renderHook(() => useThreadSelectionHandlersOrchestration(params));
+
+    act(() => {
+      result.current.handleSelectEffort("high");
+    });
+
+    expect(params.persistThreadCodexParams).toHaveBeenCalledWith({
+      effort: "high",
+    });
+    expect(params.setSelectedEffort).toHaveBeenCalledWith("high");
+    expect(params.setAppSettings).toHaveBeenCalledTimes(1);
   });
 
   it("pushes a warning toast when selected override includes ignored flags", () => {

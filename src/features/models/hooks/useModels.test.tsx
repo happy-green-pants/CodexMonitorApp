@@ -128,7 +128,9 @@ describe("useModels", () => {
       }),
     );
 
-    await waitFor(() => expect(result.current.models.length).toBe(1));
+    await waitFor(() =>
+      expect(result.current.models[0]?.displayName).toBe("gpt-5.4 (config)"),
+    );
 
     expect(result.current.models[0]).toMatchObject({
       id: "gpt-5.4",

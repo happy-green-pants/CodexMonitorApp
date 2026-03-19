@@ -1,5 +1,6 @@
 import { lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
+import type { Options as NotificationOptions } from "@tauri-apps/plugin-notification";
 import successSoundUrl from "@/assets/success-notification.mp3";
 import errorSoundUrl from "@/assets/error-notification.mp3";
 import { MainAppShell } from "@app/components/MainAppShell";
@@ -84,7 +85,10 @@ import {
   resolveWorkspaceRuntimeCodexArgsBadgeLabel,
   resolveWorkspaceRuntimeCodexArgsOverride,
 } from "@threads/utils/threadCodexParamsSeed";
-import { subscribeTrayOpenThread } from "@services/events";
+import {
+  subscribeSystemNotificationActions,
+  subscribeTrayOpenThread,
+} from "@services/events";
 import { setWorkspaceRuntimeCodexArgs } from "@services/tauri";
 
 const SettingsView = lazy(() =>
@@ -356,7 +360,6 @@ export default function MainApp() {
     appSettingsLoading,
     setAppSettings,
     queueSaveSettings,
-    activeThreadIdRef,
     setSelectedModelId,
     setSelectedEffort,
     setSelectedServiceTier,
@@ -1498,7 +1501,11 @@ export default function MainApp() {
     [handleOpenThreadLink, setActiveTab],
   );
 
-  const { recordPendingThreadLink, openThreadLinkOrQueue } =
+  const {
+    recordPendingThreadLink,
+    openThreadLinkOrQueue,
+    openThreadLinkFromNotification,
+  } =
     useSystemNotificationThreadLinks({
       hasLoadedWorkspaces: hasLoaded,
       workspacesById,
@@ -1513,6 +1520,9 @@ export default function MainApp() {
       openThreadLinkOrQueue(workspaceId, threadId);
     },
   );
+  useTauriEvent(subscribeSystemNotificationActions, (payload: NotificationOptions) => {
+    openThreadLinkFromNotification(payload);
+  });
 
   useEffect(() => {
     recordPendingThreadLinkRef.current = recordPendingThreadLink;
@@ -1665,7 +1675,7 @@ export default function MainApp() {
           onRunModeChange: setWorkspaceRunMode,
           models,
           selectedModelId,
-          onSelectModel: setSelectedModelId,
+          onSelectModel: handleSelectModel,
           modelSelections: workspaceModelSelections,
           onToggleModel: toggleWorkspaceModelSelection,
           onModelCountChange: setWorkspaceModelCount,
@@ -1674,7 +1684,7 @@ export default function MainApp() {
           onSelectCollaborationMode: setSelectedCollaborationModeId,
           reasoningOptions,
           selectedEffort,
-          onSelectEffort: setSelectedEffort,
+          onSelectEffort: handleSelectEffort,
           reasoningSupported,
           accessMode,
           onSelectAccessMode: handleSelectAccessMode,

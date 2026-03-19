@@ -104,4 +104,61 @@ describe("useSystemNotificationThreadLinks", () => {
 
     expect(openThreadLink).toHaveBeenCalledWith("ws-1", "t-2");
   });
+
+  it("opens a thread from notification metadata when both workspace and thread ids exist", async () => {
+    const workspace = makeWorkspace({ connected: true });
+    const workspacesById = new Map([[workspace.id, workspace]]);
+
+    const refreshWorkspaces = vi.fn(async () => [workspace]);
+    const connectWorkspace = vi.fn(async () => {});
+    const openThreadLink = vi.fn();
+
+    const { result } = renderHook(() =>
+      useSystemNotificationThreadLinks({
+        hasLoadedWorkspaces: true,
+        workspacesById,
+        refreshWorkspaces,
+        connectWorkspace,
+        openThreadLink,
+      }),
+    );
+
+    await act(async () => {
+      result.current.openThreadLinkFromNotification({
+        workspaceId: "ws-1",
+        threadId: "t-3",
+      });
+      await Promise.resolve();
+    });
+
+    expect(openThreadLink).toHaveBeenCalledWith("ws-1", "t-3");
+  });
+
+  it("ignores notification metadata without a thread id", async () => {
+    const workspace = makeWorkspace({ connected: true });
+    const workspacesById = new Map([[workspace.id, workspace]]);
+
+    const refreshWorkspaces = vi.fn(async () => [workspace]);
+    const connectWorkspace = vi.fn(async () => {});
+    const openThreadLink = vi.fn();
+
+    const { result } = renderHook(() =>
+      useSystemNotificationThreadLinks({
+        hasLoadedWorkspaces: true,
+        workspacesById,
+        refreshWorkspaces,
+        connectWorkspace,
+        openThreadLink,
+      }),
+    );
+
+    await act(async () => {
+      result.current.openThreadLinkFromNotification({
+        workspaceId: "ws-1",
+      });
+      await Promise.resolve();
+    });
+
+    expect(openThreadLink).not.toHaveBeenCalled();
+  });
 });

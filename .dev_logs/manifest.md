@@ -6,8 +6,8 @@
 
 ## Current Task
 
-- 打包 APP 后 Git tab repository ownership 报错修复
-- Goal: 通过 app-managed Git trust runtime 统一处理 libgit2 与 git/gh CLI 的 `safe.directory` / owner 校验，避免打包桌面端在共享仓库上出现 `Owner (-36)` 报错。
+- 通知细分、通知跳转与模型默认记忆修复
+- Goal: 仅在“需回应”与“回合结束/最终失败”时触发通知；点击系统通知稳定跳转到对应会话；新建对话默认继承最近一次显式选择的模型与 reasoning effort。
 
 ## Notes
 

@@ -19,6 +19,7 @@ type Params = {
 type Result = {
   recordPendingThreadLink: (workspaceId: string, threadId: string) => void;
   openThreadLinkOrQueue: (workspaceId: string, threadId: string) => void;
+  openThreadLinkFromNotification: (payload: unknown) => void;
 };
 
 export function useSystemNotificationThreadLinks({
@@ -92,6 +93,31 @@ export function useSystemNotificationThreadLinks({
     [hasLoadedWorkspaces, queuePendingThreadLink, tryNavigateToLink],
   );
 
+  const openThreadLinkFromNotification = useCallback(
+    (payload: unknown) => {
+      const payloadObject =
+        payload && typeof payload === "object" && !Array.isArray(payload)
+          ? (payload as Record<string, unknown>)
+          : null;
+      const extra =
+        payloadObject?.extra &&
+        typeof payloadObject.extra === "object" &&
+        !Array.isArray(payloadObject.extra)
+          ? (payloadObject.extra as Record<string, unknown>)
+          : null;
+      const source =
+        extra ??
+        payloadObject;
+      const workspaceId = String(source?.workspaceId ?? "").trim();
+      const threadId = String(source?.threadId ?? "").trim();
+      if (!workspaceId || !threadId) {
+        return;
+      }
+      openThreadLinkOrQueue(workspaceId, threadId);
+    },
+    [openThreadLinkOrQueue],
+  );
+
   const focusHandler = useMemo(() => () => void tryNavigateToLink(), [tryNavigateToLink]);
 
   useEffect(() => {
@@ -112,5 +138,6 @@ export function useSystemNotificationThreadLinks({
   return {
     recordPendingThreadLink: queuePendingThreadLink,
     openThreadLinkOrQueue,
+    openThreadLinkFromNotification,
   };
 }

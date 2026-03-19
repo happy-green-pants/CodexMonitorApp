@@ -262,6 +262,16 @@ export function useAgentResponseRequiredNotifications({
       return;
     }
     notifiedApprovalsRef.current.add(approvalKey);
+    const approvalThreadId = String(
+      latestUnnotifiedApproval.params?.threadId ??
+        latestUnnotifiedApproval.params?.thread_id ??
+        "",
+    ).trim();
+    const approvalTurnId = String(
+      latestUnnotifiedApproval.params?.turnId ??
+        latestUnnotifiedApproval.params?.turn_id ??
+        "",
+    ).trim();
 
     const workspaceName = getWorkspaceName?.(latestUnnotifiedApproval.workspace_id);
     const title = workspaceName
@@ -277,6 +287,8 @@ export function useAgentResponseRequiredNotifications({
       type: "approval",
       workspaceId,
       requestId: latestUnnotifiedApproval.request_id,
+      ...(approvalThreadId ? { threadId: approvalThreadId } : {}),
+      ...(approvalTurnId ? { turnId: approvalTurnId } : {}),
     });
     scheduleRetry();
   }, [

@@ -275,40 +275,14 @@ export function useAgentSystemNotifications({
   const handleAgentMessageCompleted = useCallback(
     (event: { workspaceId: string; threadId: string; text: string }) => {
       const threadKey = buildThreadKey(event.workspaceId, event.threadId);
-      // Store the message text for use in turn completion notification
+      // Keep the latest assistant text so the eventual turn-complete notification
+      // can show something useful without notifying on every small reply.
       if (event.text) {
         lastMessageByThread.current.set(threadKey, event.text);
       }
       recordStartIfMissing(event.workspaceId, event.threadId);
-      const activeTurnId = turnIdByThread.current.get(threadKey) ?? "";
-      const durationMs = consumeDuration(event.workspaceId, event.threadId, activeTurnId);
-      if (activeTurnId) {
-        turnIdByThread.current.delete(threadKey);
-      }
-      if (
-        !shouldNotify(
-          event.workspaceId,
-          event.threadId,
-          durationMs,
-          threadKey,
-        )
-      ) {
-        return;
-      }
-      const { title, body } = getNotificationContent(
-        event.workspaceId,
-        event.threadId,
-        "Your agent has finished its task.",
-      );
-      onThreadNotificationSent?.(event.workspaceId, event.threadId);
-      void notify(title, body, "success", {
-        kind: "thread",
-        workspaceId: event.workspaceId,
-        threadId: event.threadId,
-      });
-      lastMessageByThread.current.delete(threadKey);
     },
-    [consumeDuration, getNotificationContent, notify, onThreadNotificationSent, shouldNotify],
+    [recordStartIfMissing],
   );
 
   const handlers = useMemo(

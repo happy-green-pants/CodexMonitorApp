@@ -38,7 +38,6 @@ type UseThreadSelectionHandlersOrchestrationParams = {
   appSettingsLoading: boolean;
   setAppSettings: SetState<AppSettings>;
   queueSaveSettings: (next: AppSettings) => Promise<AppSettings | void>;
-  activeThreadIdRef: MutableRefObject<string | null>;
   setSelectedModelId: (id: string | null) => void;
   setSelectedEffort: (effort: string | null) => void;
   setSelectedServiceTier: (tier: ServiceTier | null | undefined) => void;
@@ -277,7 +276,6 @@ export function useThreadSelectionHandlersOrchestration({
   appSettingsLoading,
   setAppSettings,
   queueSaveSettings,
-  activeThreadIdRef,
   setSelectedModelId,
   setSelectedEffort,
   setSelectedServiceTier,
@@ -289,8 +287,7 @@ export function useThreadSelectionHandlersOrchestration({
   const handleSelectModel = useCallback(
     (id: string | null) => {
       setSelectedModelId(id);
-      const hasActiveThread = Boolean(activeThreadIdRef.current);
-      if (!appSettingsLoading && !hasActiveThread) {
+      if (!appSettingsLoading) {
         setAppSettings((current) => {
           if (current.lastComposerModelId === id) {
             return current;
@@ -303,7 +300,6 @@ export function useThreadSelectionHandlersOrchestration({
       persistThreadCodexParams({ modelId: id });
     },
     [
-      activeThreadIdRef,
       appSettingsLoading,
       persistThreadCodexParams,
       queueSaveSettings,
@@ -316,8 +312,7 @@ export function useThreadSelectionHandlersOrchestration({
     (raw: string | null) => {
       const next = typeof raw === "string" && raw.trim().length > 0 ? raw.trim() : null;
       setSelectedEffort(next);
-      const hasActiveThread = Boolean(activeThreadIdRef.current);
-      if (!appSettingsLoading && !hasActiveThread) {
+      if (!appSettingsLoading) {
         setAppSettings((current) => {
           if (current.lastComposerReasoningEffort === next) {
             return current;
@@ -330,7 +325,6 @@ export function useThreadSelectionHandlersOrchestration({
       persistThreadCodexParams({ effort: next });
     },
     [
-      activeThreadIdRef,
       appSettingsLoading,
       persistThreadCodexParams,
       queueSaveSettings,
