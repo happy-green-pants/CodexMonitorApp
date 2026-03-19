@@ -697,6 +697,18 @@ pub(crate) fn build_codex_command_with_bin(
     Ok(command)
 }
 
+fn app_server_command_args(codex_args: Option<&str>) -> Result<Vec<String>, String> {
+    let mut command_args = parse_codex_args(codex_args)?;
+    let has_search_flag = command_args
+        .iter()
+        .any(|arg| arg == "--search" || arg.starts_with("--search="));
+    if !has_search_flag {
+        command_args.push("--search".to_string());
+    }
+    command_args.push("app-server".to_string());
+    Ok(command_args)
+}
+
 pub(crate) async fn check_codex_installation(
     codex_bin: Option<String>,
 ) -> Result<Option<String>, String> {
@@ -756,12 +768,50 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
 ) -> Result<Arc<WorkspaceSession>, String> {
     let codex_bin = default_codex_bin;
     let _ = check_codex_installation(codex_bin.clone()).await?;
+    let bin = codex_bin
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "codex".into());
+    let path_env = build_codex_path_env(codex_bin.as_deref());
+    let command_args = app_server_command_args(codex_args.as_deref())?;
 
-    let mut command = build_codex_command_with_bin(
-        codex_bin,
-        codex_args.as_deref(),
-        vec!["app-server".to_string()],
-    )?;
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let bin_trimmed = bin.trim();
+        let resolved = resolve_windows_executable(bin_trimmed, path_env.as_deref());
+        let resolved_path = resolved
+            .as_deref()
+            .unwrap_or_else(|| Path::new(bin_trimmed));
+        let ext = resolved_path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| ext.to_ascii_lowercase());
+
+        if matches!(ext.as_deref(), Some("cmd") | Some("bat")) {
+            let mut command = tokio_command("cmd");
+            let command_line = build_cmd_c_command(resolved_path, &command_args)?;
+            command.arg("/D");
+            command.arg("/S");
+            command.arg("/C");
+            command.raw_arg(command_line);
+            command
+        } else {
+            let mut command = tokio_command(resolved_path);
+            command.args(command_args);
+            command
+        }
+    };
+
+    #[cfg(not(target_os = "windows"))]
+    let mut command = {
+        let mut command = tokio_command(bin.trim());
+        command.args(command_args);
+        command
+    };
+
+    if let Some(path_env) = path_env {
+        command.env("PATH", path_env);
+    }
     command.current_dir(&entry.path);
     if let Some(path) = codex_home.as_ref() {
         command.env("CODEX_HOME", path);
@@ -1105,13 +1155,26 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
 #[cfg(test)]
 mod tests {
     use super::{
-        build_initialize_params, extract_related_thread_ids, extract_thread_entries_from_thread_list_result,
-        extract_thread_id, normalize_root_path, resolve_workspace_for_cwd,
+        app_server_command_args, build_initialize_params, extract_related_thread_ids,
+        extract_thread_entries_from_thread_list_result, extract_thread_id, normalize_root_path,
+        resolve_workspace_for_cwd,
         should_suppress_hidden_thread_event, source_subagent_kind,
         thread_started_is_memory_consolidation,
     };
-    use std::collections::HashMap;
     use serde_json::json;
+    use std::collections::HashMap;
+
+    #[test]
+    fn app_server_command_args_force_search_when_missing() {
+        let args = app_server_command_args(Some("--profile dev")).expect("args");
+        assert_eq!(args, vec!["--profile", "dev", "--search", "app-server"]);
+    }
+
+    #[test]
+    fn app_server_command_args_do_not_duplicate_search() {
+        let args = app_server_command_args(Some("--profile dev --search")).expect("args");
+        assert_eq!(args, vec!["--profile", "dev", "--search", "app-server"]);
+    }
 
     #[test]
     fn extract_thread_id_reads_camel_case() {

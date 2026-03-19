@@ -6,8 +6,8 @@
 
 ## Current Task
 
-- 修复 Workspace Home（Projects）发送按钮误切旧会话
-- Goal: 在手机紧凑布局的 Workspace Home 中，无论点击 Send 还是回车发送，都进入刚创建的新 thread，而不是误加载最新旧会话。
+- 全局自定义模型前端设计与实现计划
+- Goal: 在设置页新增自定义模型入口，让手动补充的模型参与现有模型选择与推理强度流程。
 
 ## Notes
 
