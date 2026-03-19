@@ -71,6 +71,24 @@ describe("useAppSettings", () => {
     expect(result.current.settings.backendMode).toBe("local");
     expect(result.current.settings.dictationModelId).toBe("base");
     expect(result.current.settings.interruptShortcut).toBeTruthy();
+    expect(result.current.settings.customModelIds).toEqual([
+      "gpt-5.4",
+      "gpt-5.3-codex",
+    ]);
+  });
+
+  it("keeps an explicit empty custom model list from saved settings", async () => {
+    getAppSettingsMock.mockResolvedValue(
+      ({
+        customModelIds: [],
+      } as unknown) as AppSettings,
+    );
+
+    const { result } = renderHook(() => useAppSettings());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.settings.customModelIds).toEqual([]);
   });
 
   it("persists settings via updateAppSettings and updates local state", async () => {

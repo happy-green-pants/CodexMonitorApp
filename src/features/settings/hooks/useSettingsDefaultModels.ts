@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ModelOption, WorkspaceInfo } from "@/types";
 import { connectWorkspace, getConfigModel, getModelList } from "@services/tauri";
-import { parseModelListResponse } from "@/features/models/utils/modelListResponse";
+import {
+  mergeModelOptionsWithFallbacks,
+  parseModelListResponse,
+} from "@/features/models/utils/modelListResponse";
 
 type SettingsDefaultModelsState = {
   models: ModelOption[];
@@ -16,8 +19,7 @@ const EMPTY_STATE: SettingsDefaultModelsState = {
   error: null,
   connectedWorkspaceCount: 0,
 };
-
-const CONFIG_MODEL_DESCRIPTION = "Configured in CODEX_HOME/config.toml";
+const EMPTY_CUSTOM_MODEL_IDS: string[] = [];
 
 const parseGptVersionScore = (slug: string): number | null => {
   const match = /^gpt-(\d+)(?:\.(\d+))?(?:\.(\d+))?/i.exec(slug.trim());
@@ -59,7 +61,10 @@ function compareModelsByLatest(a: ModelOption, b: ModelOption): number {
   return a.model.localeCompare(b.model);
 }
 
-export function useSettingsDefaultModels(projects: WorkspaceInfo[]) {
+export function useSettingsDefaultModels(
+  projects: WorkspaceInfo[],
+  customModelIds: string[] = EMPTY_CUSTOM_MODEL_IDS,
+) {
   const [state, setState] = useState<SettingsDefaultModelsState>(EMPTY_STATE);
   const requestIdRef = useRef(0);
   const sourceWorkspaceId = projects[0]?.id ?? null;
@@ -125,28 +130,11 @@ export function useSettingsDefaultModels(projects: WorkspaceInfo[]) {
       );
       const configModel =
         configModelResult.status === "fulfilled" ? configModelResult.value : null;
-      const hasConfigModel = Boolean(
-        configModel &&
-          modelsFromList.some(
-            (model) => model.model === configModel || model.id === configModel,
-          ),
-      );
-      const models = (
-        hasConfigModel || !configModel
-          ? modelsFromList
-          : [
-              {
-                id: configModel,
-                model: configModel,
-                displayName: `${configModel} (config)`,
-                description: CONFIG_MODEL_DESCRIPTION,
-                supportedReasoningEfforts: [],
-                defaultReasoningEffort: null,
-                isDefault: false,
-              },
-              ...modelsFromList,
-            ]
-      ).sort(compareModelsByLatest);
+      const models = mergeModelOptionsWithFallbacks({
+        modelsFromServer: [...modelsFromList].sort(compareModelsByLatest),
+        configModel,
+        customModelIds,
+      });
       setState({
         models,
         isLoading: false,
@@ -164,7 +152,7 @@ export function useSettingsDefaultModels(projects: WorkspaceInfo[]) {
         });
       }
     }
-  }, [sourceWorkspaceConnected, sourceWorkspaceId, sourceWorkspaceName]);
+  }, [customModelIds, sourceWorkspaceConnected, sourceWorkspaceId, sourceWorkspaceName]);
 
   useEffect(() => {
     void refresh();

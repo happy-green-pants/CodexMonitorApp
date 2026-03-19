@@ -208,7 +208,10 @@ export function useSettingsViewOrchestration({
     onUpdateAppSettings,
   });
 
-  const agentsSectionProps = useSettingsAgentsSection({ projects });
+  const agentsSectionProps = useSettingsAgentsSection({
+    projects,
+    customModelIds: appSettings.customModelIds,
+  });
 
   return {
     projectsSectionProps,

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DebugEntry, ModelOption, WorkspaceInfo } from "../../../types";
 import { getConfigModel, getModelList } from "../../../services/tauri";
 import {
+  mergeModelOptionsWithFallbacks,
   normalizeEffortValue,
   parseModelListResponse,
 } from "../utils/modelListResponse";
@@ -12,9 +13,9 @@ type UseModelsOptions = {
   preferredModelId?: string | null;
   preferredEffort?: string | null;
   selectionKey?: string | null;
+  customModelIds?: string[];
 };
-
-const CONFIG_MODEL_DESCRIPTION = "Configured in CODEX_HOME/config.toml";
+const EMPTY_CUSTOM_MODEL_IDS: string[] = [];
 
 const findModelByIdOrModel = (
   models: ModelOption[],
@@ -42,8 +43,9 @@ export function useModels({
   preferredModelId = null,
   preferredEffort = null,
   selectionKey = null,
+  customModelIds = EMPTY_CUSTOM_MODEL_IDS,
 }: UseModelsOptions) {
-  const [models, setModels] = useState<ModelOption[]>([]);
+  const [modelsFromServer, setModelsFromServer] = useState<ModelOption[]>([]);
   const [configModel, setConfigModel] = useState<string | null>(null);
   const [selectedModelId, setSelectedModelIdState] = useState<string | null>(null);
   const [selectedEffort, setSelectedEffortState] = useState<string | null>(null);
@@ -96,6 +98,16 @@ export function useModels({
     hasUserSelectedEffort.current = true;
     setSelectedEffortState(next);
   }, []);
+
+  const models = useMemo(
+    () =>
+      mergeModelOptionsWithFallbacks({
+        modelsFromServer,
+        configModel,
+        customModelIds,
+      }),
+    [configModel, customModelIds, modelsFromServer],
+  );
 
   const selectedModel = useMemo(
     () => models.find((model) => model.id === selectedModelId) ?? null,
@@ -203,28 +215,12 @@ export function useModels({
       });
       setConfigModel(configModelFromConfig);
       const dataFromServer: ModelOption[] = parseModelListResponse(response);
-      const data = (() => {
-        if (!configModelFromConfig) {
-          return dataFromServer;
-        }
-        const hasConfigModel = dataFromServer.some(
-          (model) => model.model === configModelFromConfig,
-        );
-        if (hasConfigModel) {
-          return dataFromServer;
-        }
-        const configOption: ModelOption = {
-          id: configModelFromConfig,
-          model: configModelFromConfig,
-          displayName: `${configModelFromConfig} (config)`,
-          description: CONFIG_MODEL_DESCRIPTION,
-          supportedReasoningEfforts: [],
-          defaultReasoningEffort: null,
-          isDefault: false,
-        };
-        return [configOption, ...dataFromServer];
-      })();
-      setModels(data);
+      const data = mergeModelOptionsWithFallbacks({
+        modelsFromServer: dataFromServer,
+        configModel: configModelFromConfig,
+        customModelIds,
+      });
+      setModelsFromServer(dataFromServer);
       lastFetchedWorkspaceId.current = workspaceId;
       const defaultModel = pickDefaultModel(data, configModelFromConfig);
       const existingSelection = findModelByIdOrModel(data, selectedModelId);
@@ -261,6 +257,7 @@ export function useModels({
     selectedEffort,
     selectedModelId,
     resolveEffort,
+    customModelIds,
     workspaceId,
   ]);
 
@@ -268,11 +265,11 @@ export function useModels({
     if (!workspaceId || !isConnected) {
       return;
     }
-    if (lastFetchedWorkspaceId.current === workspaceId && models.length > 0) {
+    if (lastFetchedWorkspaceId.current === workspaceId) {
       return;
     }
     refreshModels();
-  }, [isConnected, models.length, refreshModels, workspaceId]);
+  }, [isConnected, refreshModels, workspaceId]);
 
   useEffect(() => {
     if (!selectedModel) {

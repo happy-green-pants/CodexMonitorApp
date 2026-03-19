@@ -99,6 +99,7 @@ const baseSettings: AppSettings = {
   cycleWorkspacePrevShortcut: null,
   lastComposerModelId: null,
   lastComposerReasoningEffort: null,
+  customModelIds: [],
   uiScale: 1,
   theme: "system",
   usageShowRemaining: false,
@@ -262,6 +263,59 @@ const renderComposerSection = (
     onCancelDictationDownload: vi.fn(),
     onRemoveDictationModel: vi.fn(),
     initialSection: "composer",
+  };
+
+  render(<SettingsView {...props} />);
+  return { onUpdateAppSettings };
+};
+
+const renderCodexSection = (
+  options: {
+    appSettings?: Partial<AppSettings>;
+    groupedWorkspaces?: ComponentProps<typeof SettingsView>["groupedWorkspaces"];
+    onUpdateAppSettings?: ComponentProps<typeof SettingsView>["onUpdateAppSettings"];
+  } = {},
+) => {
+  cleanup();
+  const onUpdateAppSettings =
+    options.onUpdateAppSettings ?? vi.fn().mockResolvedValue(undefined);
+  const props: ComponentProps<typeof SettingsView> = {
+    reduceTransparency: false,
+    onToggleTransparency: vi.fn(),
+    appSettings: { ...baseSettings, ...options.appSettings },
+    openAppIconById: {},
+    onUpdateAppSettings,
+    workspaceGroups: [],
+    groupedWorkspaces:
+      options.groupedWorkspaces ??
+      [
+        {
+          id: null,
+          name: "Ungrouped",
+          workspaces: [workspace({ id: "w1", name: "Workspace", connected: true })],
+        },
+      ],
+    ungroupedLabel: "Ungrouped",
+    onClose: vi.fn(),
+    onMoveWorkspace: vi.fn(),
+    onDeleteWorkspace: vi.fn(),
+    onCreateWorkspaceGroup: vi.fn().mockResolvedValue(null),
+    onRenameWorkspaceGroup: vi.fn().mockResolvedValue(null),
+    onMoveWorkspaceGroup: vi.fn().mockResolvedValue(null),
+    onDeleteWorkspaceGroup: vi.fn().mockResolvedValue(null),
+    onAssignWorkspaceGroup: vi.fn().mockResolvedValue(null),
+    onRunDoctor: vi.fn().mockResolvedValue(createDoctorResult()),
+    onRunCodexUpdate: vi.fn().mockResolvedValue(createUpdateResult()),
+    onUpdateWorkspaceSettings: vi.fn().mockResolvedValue(undefined),
+    scaleShortcutTitle: "Scale shortcut",
+    scaleShortcutText: "Use Command +/-",
+    onTestNotificationSound: vi.fn(),
+    onTestSystemNotification: vi.fn(),
+    dictationModelStatus: null,
+    onDownloadDictationModel: vi.fn(),
+    onCancelDictationDownload: vi.fn(),
+    onRemoveDictationModel: vi.fn(),
+    initialSection: "codex",
   };
 
   render(<SettingsView {...props} />);
@@ -1359,6 +1413,92 @@ describe("SettingsView Codex defaults", () => {
         expect.objectContaining({ lastComposerReasoningEffort: "high" }),
       );
     });
+  });
+
+  it("adds a custom fallback model from settings", async () => {
+    const onUpdateAppSettings = vi.fn().mockResolvedValue(undefined);
+    getModelListMock.mockResolvedValue(createModelListResponse([]));
+
+    renderCodexSection({
+      onUpdateAppSettings,
+      appSettings: { customModelIds: ["gpt-5.4", "gpt-5.3-codex"] },
+    });
+
+    const input = await screen.findByLabelText("New custom model ID");
+    fireEvent.change(input, { target: { value: "gpt-5.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add custom model" }));
+
+    await waitFor(() => {
+      expect(onUpdateAppSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customModelIds: ["gpt-5.4", "gpt-5.3-codex", "gpt-5.5"],
+        }),
+      );
+    });
+  });
+
+  it("edits and removes custom fallback models from settings", async () => {
+    const onUpdateAppSettings = vi.fn().mockResolvedValue(undefined);
+    getModelListMock.mockResolvedValue(createModelListResponse([]));
+
+    renderCodexSection({
+      onUpdateAppSettings,
+      appSettings: { customModelIds: ["gpt-5.4", "gpt-5.3-codex"] },
+    });
+
+    const customInputs = await screen.findAllByLabelText("Custom model ID");
+    fireEvent.change(customInputs[0] as HTMLInputElement, {
+      target: { value: "gpt-5.4-updated" },
+    });
+
+    await waitFor(() => {
+      expect(onUpdateAppSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customModelIds: ["gpt-5.4-updated", "gpt-5.3-codex"],
+        }),
+      );
+    });
+
+    onUpdateAppSettings.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Remove gpt-5.3-codex" }));
+
+    await waitFor(() => {
+      expect(onUpdateAppSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customModelIds: ["gpt-5.4"],
+        }),
+      );
+    });
+  });
+
+  it("blocks empty and duplicate custom fallback model IDs", async () => {
+    const onUpdateAppSettings = vi.fn().mockResolvedValue(undefined);
+    getModelListMock.mockResolvedValue(createModelListResponse([]));
+
+    renderCodexSection({
+      onUpdateAppSettings,
+      appSettings: { customModelIds: ["gpt-5.4", "gpt-5.3-codex"] },
+    });
+
+    const input = await screen.findByLabelText("New custom model ID");
+    const addButton = screen.getByRole("button", { name: "Add custom model" });
+
+    await waitFor(() => {
+      expect(onUpdateAppSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lastComposerModelId: "gpt-5.4",
+          lastComposerReasoningEffort: "medium",
+        }),
+      );
+    });
+    onUpdateAppSettings.mockClear();
+    expect(addButton).toHaveProperty("disabled", true);
+
+    fireEvent.change(input, { target: { value: "gpt-5.4" } });
+
+    expect(addButton).toHaveProperty("disabled", true);
+    expect(screen.getByText("This model ID is already in the fallback list.")).toBeTruthy();
+    expect(onUpdateAppSettings).not.toHaveBeenCalled();
   });
 });
 

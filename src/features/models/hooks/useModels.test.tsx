@@ -23,6 +23,120 @@ describe("useModels", () => {
     vi.clearAllMocks();
   });
 
+  it("adds custom fallback models when model/list does not include them", async () => {
+    vi.mocked(getModelList).mockResolvedValueOnce({
+      result: {
+        data: [
+          {
+            id: "remote-1",
+            model: "gpt-5.2",
+            displayName: "GPT-5.2",
+            supportedReasoningEfforts: [],
+            defaultReasoningEffort: null,
+            isDefault: true,
+          },
+        ],
+      },
+    });
+    vi.mocked(getConfigModel).mockResolvedValueOnce(null);
+
+    const { result } = renderHook(() =>
+      useModels({
+        activeWorkspace: workspace,
+        customModelIds: ["gpt-5.4", "gpt-5.3-codex"],
+      }),
+    );
+
+    await waitFor(() => expect(result.current.models.length).toBe(3));
+
+    expect(result.current.models.map((model) => model.model)).toEqual([
+      "gpt-5.2",
+      "gpt-5.4",
+      "gpt-5.3-codex",
+    ]);
+    expect(result.current.models[1]).toMatchObject({
+      id: "gpt-5.4",
+      model: "gpt-5.4",
+      defaultReasoningEffort: "medium",
+    });
+    expect(
+      result.current.models[1]?.supportedReasoningEfforts.map(
+        (effort) => effort.reasoningEffort,
+      ),
+    ).toEqual(["low", "medium", "high", "xhigh"]);
+  });
+
+  it("updates merged models when custom fallback settings change", async () => {
+    vi.mocked(getModelList).mockResolvedValueOnce({
+      result: {
+        data: [
+          {
+            id: "remote-1",
+            model: "gpt-5.2",
+            displayName: "GPT-5.2",
+            supportedReasoningEfforts: [],
+            defaultReasoningEffort: null,
+            isDefault: true,
+          },
+        ],
+      },
+    });
+    vi.mocked(getConfigModel).mockResolvedValueOnce(null);
+
+    const { result, rerender } = renderHook(
+      ({ customModelIds }: { customModelIds: string[] }) =>
+        useModels({
+          activeWorkspace: workspace,
+          customModelIds,
+        }),
+      {
+        initialProps: {
+          customModelIds: [] as string[],
+        },
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.models.map((model) => model.model)).toEqual(["gpt-5.2"]);
+    });
+
+    rerender({ customModelIds: ["gpt-5.4"] });
+
+    await waitFor(() => {
+      expect(result.current.models.map((model) => model.model)).toEqual([
+        "gpt-5.2",
+        "gpt-5.4",
+      ]);
+    });
+
+    expect(getModelList).toHaveBeenCalledTimes(1);
+    expect(getConfigModel).toHaveBeenCalledTimes(1);
+  });
+
+  it("deduplicates config and custom fallback models by slug", async () => {
+    vi.mocked(getModelList).mockResolvedValueOnce({
+      result: {
+        data: [],
+      },
+    });
+    vi.mocked(getConfigModel).mockResolvedValueOnce("gpt-5.4");
+
+    const { result } = renderHook(() =>
+      useModels({
+        activeWorkspace: workspace,
+        customModelIds: ["gpt-5.4"],
+      }),
+    );
+
+    await waitFor(() => expect(result.current.models.length).toBe(1));
+
+    expect(result.current.models[0]).toMatchObject({
+      id: "gpt-5.4",
+      model: "gpt-5.4",
+      displayName: "gpt-5.4 (config)",
+    });
+  });
+
   it("adds the config model when it is missing from model/list", async () => {
     vi.mocked(getModelList).mockResolvedValueOnce({
       result: {

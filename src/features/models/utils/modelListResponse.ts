@@ -1,11 +1,102 @@
 import type { ModelOption } from "../../../types";
 
+export const CONFIG_MODEL_DESCRIPTION = "Configured in CODEX_HOME/config.toml";
+export const CUSTOM_FALLBACK_MODEL_DESCRIPTION = "Custom fallback model";
+
+const DEFAULT_CUSTOM_REASONING_EFFORTS = ["low", "medium", "high", "xhigh"] as const;
+
 export function normalizeEffortValue(value: unknown): string | null {
   if (typeof value !== "string") {
     return null;
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+const normalizeModelKey = (value: string): string => value.trim().toLowerCase();
+
+export function normalizeCustomModelIds(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "string") {
+      continue;
+    }
+    const trimmed = entry.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const key = normalizeModelKey(trimmed);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(trimmed);
+  }
+  return result;
+}
+
+export function hasModelIdOrSlug(models: ModelOption[], idOrModel: string): boolean {
+  const key = normalizeModelKey(idOrModel);
+  return models.some(
+    (model) =>
+      normalizeModelKey(model.id) === key || normalizeModelKey(model.model) === key,
+  );
+}
+
+export function createConfigModelOption(modelId: string): ModelOption {
+  return {
+    id: modelId,
+    model: modelId,
+    displayName: `${modelId} (config)`,
+    description: CONFIG_MODEL_DESCRIPTION,
+    supportedReasoningEfforts: [],
+    defaultReasoningEffort: null,
+    isDefault: false,
+  };
+}
+
+export function createCustomFallbackModelOption(modelId: string): ModelOption {
+  return {
+    id: modelId,
+    model: modelId,
+    displayName: modelId,
+    description: CUSTOM_FALLBACK_MODEL_DESCRIPTION,
+    supportedReasoningEfforts: DEFAULT_CUSTOM_REASONING_EFFORTS.map((reasoningEffort) => ({
+      reasoningEffort,
+      description: "",
+    })),
+    defaultReasoningEffort: "medium",
+    isDefault: false,
+  };
+}
+
+export function mergeModelOptionsWithFallbacks({
+  modelsFromServer,
+  configModel,
+  customModelIds,
+}: {
+  modelsFromServer: ModelOption[];
+  configModel: string | null;
+  customModelIds?: string[];
+}): ModelOption[] {
+  const merged = [...modelsFromServer];
+
+  if (configModel && !hasModelIdOrSlug(merged, configModel)) {
+    merged.unshift(createConfigModelOption(configModel));
+  }
+
+  for (const customModelId of normalizeCustomModelIds(customModelIds ?? [])) {
+    if (hasModelIdOrSlug(merged, customModelId)) {
+      continue;
+    }
+    merged.push(createCustomFallbackModelOption(customModelId));
+  }
+
+  return merged;
 }
 
 function extractModelItems(response: unknown): unknown[] {

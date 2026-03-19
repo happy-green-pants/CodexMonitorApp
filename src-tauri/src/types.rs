@@ -485,6 +485,8 @@ pub(crate) struct AppSettings {
     pub(crate) last_composer_model_id: Option<String>,
     #[serde(default, rename = "lastComposerReasoningEffort")]
     pub(crate) last_composer_reasoning_effort: Option<String>,
+    #[serde(default, rename = "customModelIds")]
+    pub(crate) custom_model_ids: Vec<String>,
     #[serde(default = "default_ui_scale", rename = "uiScale")]
     pub(crate) ui_scale: f64,
     #[serde(default = "default_theme", rename = "theme")]
@@ -1121,6 +1123,10 @@ fn default_selected_open_app_id() -> String {
     }
 }
 
+fn default_custom_model_ids() -> Vec<String> {
+    vec!["gpt-5.4".to_string(), "gpt-5.3-codex".to_string()]
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -1154,6 +1160,7 @@ impl Default for AppSettings {
             cycle_workspace_prev_shortcut: default_cycle_workspace_prev_shortcut(),
             last_composer_model_id: None,
             last_composer_reasoning_effort: None,
+            custom_model_ids: default_custom_model_ids(),
             ui_scale: 1.0,
             theme: default_theme(),
             usage_show_remaining: default_usage_show_remaining(),

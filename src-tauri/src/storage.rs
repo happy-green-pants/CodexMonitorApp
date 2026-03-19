@@ -228,4 +228,24 @@ mod tests {
         let settings = read_settings(&path).expect("read settings");
         assert_eq!(settings.follow_up_message_behavior, "queue");
     }
+
+    #[test]
+    fn read_settings_preserves_explicit_empty_custom_model_ids() {
+        let temp_dir = std::env::temp_dir().join(format!("codex-monitor-test-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&temp_dir).expect("create temp dir");
+        let path = temp_dir.join("settings.json");
+
+        std::fs::write(
+            &path,
+            r#"{
+  "customModelIds": [],
+  "theme": "dark"
+}"#,
+        )
+        .expect("write settings");
+
+        let settings = read_settings(&path).expect("read settings");
+        assert!(settings.custom_model_ids.is_empty());
+        assert_eq!(settings.theme, "dark");
+    }
 }

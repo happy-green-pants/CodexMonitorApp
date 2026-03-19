@@ -16,6 +16,7 @@ import { useSettingsDefaultModels } from "./useSettingsDefaultModels";
 
 type UseSettingsAgentsSectionArgs = {
   projects: WorkspaceInfo[];
+  customModelIds: string[];
 };
 
 export type SettingsAgentsSectionProps = {
@@ -82,6 +83,7 @@ const toErrorMessage = (value: unknown, fallback: string): string => {
 
 export const useSettingsAgentsSection = ({
   projects,
+  customModelIds,
 }: UseSettingsAgentsSectionArgs): SettingsAgentsSectionProps => {
   const [settings, setSettings] = useState<AgentsSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -102,7 +104,7 @@ export const useSettingsAgentsSection = ({
     models: modelOptions,
     isLoading: modelOptionsLoading,
     error: modelOptionsError,
-  } = useSettingsDefaultModels(projects);
+  } = useSettingsDefaultModels(projects, customModelIds);
 
   const refresh = useCallback(async () => {
     setIsLoading(true);

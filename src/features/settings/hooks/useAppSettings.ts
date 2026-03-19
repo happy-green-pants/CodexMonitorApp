@@ -19,6 +19,7 @@ import { normalizeOpenAppTargets } from "@app/utils/openApp";
 import { getDefaultInterruptShortcut, isMacPlatform } from "@utils/shortcuts";
 import { isMobilePlatform } from "@utils/platformPaths";
 import { DEFAULT_COMMIT_MESSAGE_PROMPT } from "@utils/commitMessagePrompt";
+import { normalizeCustomModelIds } from "@/features/models/utils/modelListResponse";
 
 const allowedThemes = new Set(["system", "light", "dark", "dim"]);
 const allowedPersonality = new Set(["friendly", "pragmatic"]);
@@ -29,6 +30,7 @@ const DEFAULT_REMOTE_HTTP_ENDPOINT = "https://codex.example.com";
 const DEFAULT_REMOTE_BACKEND_ID = "remote-default";
 const DEFAULT_REMOTE_BACKEND_NAME = "Primary remote";
 const DEFAULT_REMOTE_PROVIDER: AppSettings["remoteBackendProvider"] = "tcp";
+const DEFAULT_CUSTOM_MODEL_IDS = ["gpt-5.4", "gpt-5.3-codex"];
 
 type RemoteBackendTarget = AppSettings["remoteBackends"][number];
 
@@ -188,6 +190,7 @@ function buildDefaultSettings(): AppSettings {
     cycleWorkspacePrevShortcut: isMac ? "cmd+shift+up" : "ctrl+alt+shift+up",
     lastComposerModelId: null,
     lastComposerReasoningEffort: null,
+    customModelIds: [...DEFAULT_CUSTOM_MODEL_IDS],
     uiScale: UI_SCALE_DEFAULT,
     theme: "system",
     usageShowRemaining: false,
@@ -268,6 +271,7 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
     ...remoteBackendSettings,
     codexBin: settings.codexBin?.trim() ? settings.codexBin.trim() : null,
     codexArgs: settings.codexArgs?.trim() ? settings.codexArgs.trim() : null,
+    customModelIds: normalizeCustomModelIds(settings.customModelIds),
     uiScale: clampUiScale(settings.uiScale),
     theme: allowedThemes.has(settings.theme) ? settings.theme : "system",
     uiFontFamily: normalizeFontFamily(
@@ -317,11 +321,18 @@ export function useAppSettings() {
     void (async () => {
       try {
         const response = await getAppSettings();
+        const rawCustomModelIds =
+          Object.prototype.hasOwnProperty.call(response, "customModelIds") &&
+          Array.isArray((response as Partial<AppSettings>).customModelIds)
+            ? (response as Partial<AppSettings>).customModelIds
+            : [];
+        const resolvedCustomModelIds = normalizeCustomModelIds(rawCustomModelIds);
         if (active) {
           setSettings(
             normalizeAppSettings({
               ...defaultSettings,
               ...response,
+              customModelIds: resolvedCustomModelIds,
             }),
           );
         }

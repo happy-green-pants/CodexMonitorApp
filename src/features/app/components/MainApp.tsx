@@ -316,6 +316,7 @@ export default function MainApp() {
     preferredModelId,
     preferredEffort,
     selectionKey: threadCodexSelectionKey,
+    customModelIds: appSettings.customModelIds,
   });
 
   const {

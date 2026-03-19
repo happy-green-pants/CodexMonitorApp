@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Stethoscope from "lucide-react/dist/esm/icons/stethoscope";
 import type { Dispatch, SetStateAction } from "react";
 import type {
@@ -12,6 +12,7 @@ import {
   SettingsToggleRow,
 } from "@/features/design-system/components/settings/SettingsPrimitives";
 import { FileEditorCard } from "@/features/shared/components/FileEditorCard";
+import { normalizeCustomModelIds } from "@/features/models/utils/modelListResponse";
 
 type SettingsCodexSectionProps = {
   appSettings: AppSettings;
@@ -146,6 +147,7 @@ export function SettingsCodexSection({
   onRefreshGlobalConfig,
   onSaveGlobalConfig,
 }: SettingsCodexSectionProps) {
+  const [newCustomModelId, setNewCustomModelId] = useState("");
   const latestModelSlug = defaultModels[0]?.model ?? null;
   const savedModelSlug = useMemo(
     () => coerceSavedModelSlug(appSettings.lastComposerModelId, defaultModels),
@@ -168,6 +170,18 @@ export function SettingsCodexSection({
     () => normalizeEffortValue(appSettings.lastComposerReasoningEffort),
     [appSettings.lastComposerReasoningEffort],
   );
+  const customModelIds = useMemo(
+    () => normalizeCustomModelIds(appSettings.customModelIds),
+    [appSettings.customModelIds],
+  );
+  const normalizedNewCustomModelId = useMemo(() => newCustomModelId.trim(), [newCustomModelId]);
+  const duplicateCustomModelId = useMemo(() => {
+    const candidate = normalizedNewCustomModelId.toLowerCase();
+    if (!candidate) {
+      return false;
+    }
+    return customModelIds.some((modelId) => modelId.toLowerCase() === candidate);
+  }, [customModelIds, normalizedNewCustomModelId]);
   const selectedEffort = useMemo(() => {
     if (!reasoningSupported) {
       return "";
@@ -226,6 +240,23 @@ export function SettingsCodexSection({
     selectedModelSlug,
     selectedEffort,
   ]);
+
+  const updateCustomModelIds = (nextCustomModelIds: string[]) => {
+    void onUpdateAppSettings({
+      ...appSettings,
+      customModelIds: normalizeCustomModelIds(nextCustomModelIds),
+    });
+  };
+
+  const customModelInputError = useMemo(() => {
+    if (!normalizedNewCustomModelId) {
+      return null;
+    }
+    if (duplicateCustomModelId) {
+      return "This model ID is already in the fallback list.";
+    }
+    return null;
+  }, [duplicateCustomModelId, normalizedNewCustomModelId]);
 
   return (
     <SettingsSection
@@ -521,6 +552,95 @@ export function SettingsCodexSection({
           Choose whether <code>/review</code> runs in the current thread or a detached review
           thread.
         </div>
+      </div>
+
+      <div className="settings-divider" />
+      <div className="settings-field">
+        <div className="settings-field-label settings-field-label--section">
+          Custom model fallbacks
+        </div>
+        <div className="settings-help">
+          Add model IDs that should appear only when the workspace does not return them in
+          <code> model/list</code>. Service-provided metadata always wins.
+        </div>
+        <label className="settings-field-label" htmlFor="custom-model-add">
+          New custom model ID
+        </label>
+        <div className="settings-field-row">
+          <input
+            id="custom-model-add"
+            className="settings-input"
+            value={newCustomModelId}
+            placeholder="gpt-5.4"
+            onChange={(event) => setNewCustomModelId(event.target.value)}
+          />
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => {
+              if (!normalizedNewCustomModelId || duplicateCustomModelId) {
+                return;
+              }
+              updateCustomModelIds([...customModelIds, normalizedNewCustomModelId]);
+              setNewCustomModelId("");
+            }}
+            disabled={!normalizedNewCustomModelId || duplicateCustomModelId}
+          >
+            Add custom model
+          </button>
+        </div>
+        {customModelInputError && (
+          <div className="settings-help settings-help-error">{customModelInputError}</div>
+        )}
+        {customModelIds.length === 0 ? (
+          <div className="settings-help">
+            No custom fallback models configured. Recommended starter IDs: <code>gpt-5.4</code>,{" "}
+            <code>gpt-5.3-codex</code>.
+          </div>
+        ) : (
+          <div className="settings-field">
+            {customModelIds.map((modelId, index) => (
+              <div className="settings-field" key={`${modelId}-${index}`}>
+                <div className="settings-field-row">
+                  <label className="sr-only" htmlFor={`custom-model-${index}`}>
+                    Custom model ID
+                  </label>
+                  <input
+                    id={`custom-model-${index}`}
+                    className="settings-input"
+                    aria-label="Custom model ID"
+                    value={modelId}
+                    onChange={(event) => {
+                      const nextValue = event.target.value.trim();
+                      if (!nextValue) {
+                        return;
+                      }
+                      const nextCustomModelIds = [...customModelIds];
+                      nextCustomModelIds[index] = nextValue;
+                      const normalizedNext = normalizeCustomModelIds(nextCustomModelIds);
+                      if (normalizedNext.length !== nextCustomModelIds.length) {
+                        return;
+                      }
+                      updateCustomModelIds(nextCustomModelIds);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="ghost"
+                    aria-label={`Remove ${modelId}`}
+                    onClick={() => {
+                      updateCustomModelIds(
+                        customModelIds.filter((_, itemIndex) => itemIndex !== index),
+                      );
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <FileEditorCard
