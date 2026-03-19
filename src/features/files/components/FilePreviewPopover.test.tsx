@@ -12,6 +12,45 @@ afterEach(() => {
 });
 
 describe("FilePreviewPopover", () => {
+  it("renders a dismissible backdrop for constrained presentation", () => {
+    const onBackdropClick = vi.fn();
+    const props = {
+      path: "src/example.ts",
+      absolutePath: "/workspace/src/example.ts",
+      content: "one\ntwo",
+      truncated: false,
+      previewKind: "text" as const,
+      imageSrc: null,
+      openTargets: [],
+      openAppIconById: {},
+      selectedOpenAppId: "",
+      onSelectOpenAppId: vi.fn(),
+      selection: { start: 0, end: 0 },
+      onSelectLine: vi.fn(),
+      onClearSelection: vi.fn(),
+      onAddSelection: vi.fn(),
+      onClose: vi.fn(),
+      presentation: "constrained" as const,
+      onBackdropClick,
+    };
+    const { container } = render(
+      <FilePreviewPopover {...props} />,
+    );
+
+    const backdrop = container.querySelector(".file-preview-overlay");
+    const popover = container.querySelector(".file-preview-popover--constrained");
+
+    expect(backdrop).toBeTruthy();
+    expect(popover).toBeTruthy();
+
+    if (!backdrop) {
+      throw new Error("Expected constrained preview backdrop");
+    }
+
+    fireEvent.click(backdrop);
+    expect(onBackdropClick).toHaveBeenCalledTimes(1);
+  });
+
   it("renders selection hints for text previews", () => {
     render(
       <FilePreviewPopover

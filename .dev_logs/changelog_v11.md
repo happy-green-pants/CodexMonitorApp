@@ -76,3 +76,15 @@ State Summary (from `changelog_v10.md`):
 - **Change**: 运行验证并补齐通过证据：定向单测 `npm run test -- src/services/events.test.ts`、`npm run test -- src/features/models/hooks/useModels.test.tsx` 通过；`npm run typecheck` 通过；`npm run test` 全量通过（`142` files, `989` tests）。另记录全量测试中仍有既有 `act(...)` 与预期错误日志输出的 stderr 警告，但不影响退出码。
 - **Why**: 需要用 fresh verification evidence 证明本轮通知/跳转/模型记忆修改没有引入回归，并明确区分“测试通过”与“测试 stderr 噪声”。
 - **Goal**: 为最终交付提供完整、可复现的验证结论。
+---
+### [2026-03-19 20:37] | Agent: Codex (GPT-5)
+- **File**: `/.dev_logs/manifest.md`, `src/features/files/components/FileTreePanel.tsx`, `src/features/files/components/FilePreviewPopover.tsx`, `src/styles/file-tree.css`
+- **Change**: 将 manifest 当前任务切换为“Git/Files 文件预览移动端浮层适配”；为文件预览新增 `anchored` / `constrained` 双展示模式，窄屏通过 `matchMedia("(max-width: 720px)")` 切到受限浮层+遮罩，重算视口内宽高与位置，隐藏箭头并优化工具栏、图片区、代码区在小屏下的内部滚动与换行。
+- **Why**: 原有预览固定按桌面锚点气泡渲染，`width: 640` 且无遮罩，小屏点击后会超出视口，造成内容看不全且关闭按钮/外部区域不可达。
+- **Goal**: 让移动端文件预览始终完整落在视口内，可通过遮罩或关闭按钮退出，同时不破坏桌面端现有浏览工作流。
+---
+### [2026-03-19 20:37] | Agent: Codex (GPT-5)
+- **File**: `src/features/files/components/FilePreviewPopover.test.tsx`, `src/features/files/components/FileTreePanel.test.tsx`
+- **Change**: 先补失败测试再实现：新增 `FilePreviewPopover` 受限浮层遮罩测试；新增 `FileTreePanel` 窄屏文本/图片预览测试，覆盖受限浮层渲染、遮罩关闭、图片预览仍走同一小屏容器等回归场景。
+- **Why**: 该问题直接影响移动端可用性，需要用测试锁定“可关闭 + 可浏览 + 图片文本一致”的交互契约，避免后续样式回退。
+- **Goal**: 为移动端文件预览适配建立自动化保护网，并按 TDD 证明修复针对的正是本次窄屏问题。

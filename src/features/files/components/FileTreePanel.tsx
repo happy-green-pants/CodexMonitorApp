@@ -70,7 +70,25 @@ type FileTreeRowEntry = {
   isExpanded: boolean;
 };
 
+type FilePreviewPresentation = "anchored" | "constrained";
+
+type FilePreviewLayout = {
+  presentation: FilePreviewPresentation;
+  top: number;
+  left: number;
+  width: number;
+  maxHeight: number;
+  arrowTop?: number;
+};
+
 const FILE_TREE_ROW_HEIGHT = 28;
+const NARROW_PREVIEW_BREAKPOINT_PX = 720;
+const PREVIEW_VIEWPORT_PADDING_PX = 12;
+const PREVIEW_DESKTOP_PADDING_PX = 16;
+const PREVIEW_DESKTOP_WIDTH_PX = 640;
+const PREVIEW_DESKTOP_HEIGHT_PX = 520;
+const PREVIEW_PHONE_MAX_WIDTH_PX = 720;
+const PREVIEW_PHONE_MAX_HEIGHT_VH = 0.78;
 
 function buildTree(entries: FileEntry[]): { nodes: FileTreeNode[]; folderPaths: Set<string> } {
   const root = new Map<string, FileTreeBuildNode>();
@@ -179,12 +197,7 @@ export function FileTreePanel({
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [previewPath, setPreviewPath] = useState<string | null>(null);
-  const [previewAnchor, setPreviewAnchor] = useState<{
-    top: number;
-    left: number;
-    arrowTop: number;
-    height: number;
-  } | null>(null);
+  const [previewLayout, setPreviewLayout] = useState<FilePreviewLayout | null>(null);
   const [previewContent, setPreviewContent] = useState<string>("");
   const [previewTruncated, setPreviewTruncated] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -194,6 +207,7 @@ export function FileTreePanel({
     end: number;
   } | null>(null);
   const [isDragSelecting, setIsDragSelecting] = useState(false);
+  const [isNarrowPreviewViewport, setIsNarrowPreviewViewport] = useState(false);
   const dragAnchorLineRef = useRef<number | null>(null);
   const dragMovedRef = useRef(false);
   const hasManualToggle = useRef(false);
@@ -241,6 +255,26 @@ export function FileTreePanel({
     hasFolders && Array.from(visibleFolderPaths).every((path) => expandedFolders.has(path));
 
   useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
+    }
+    const query = window.matchMedia(`(max-width: ${NARROW_PREVIEW_BREAKPOINT_PX}px)`);
+    const syncMatches = (matches: boolean) => {
+      setIsNarrowPreviewViewport(matches);
+    };
+    syncMatches(query.matches);
+    const handleChange = (event: MediaQueryListEvent) => {
+      syncMatches(event.matches);
+    };
+    query.addEventListener?.("change", handleChange);
+    query.addListener?.(handleChange);
+    return () => {
+      query.removeEventListener?.("change", handleChange);
+      query.removeListener?.(handleChange);
+    };
+  }, []);
+
+  useEffect(() => {
     setExpandedFolders((prev) => {
       if (normalizedQuery || filterMode === "modified") {
         return new Set(folderPaths);
@@ -264,7 +298,7 @@ export function FileTreePanel({
 
   useEffect(() => {
     setPreviewPath(null);
-    setPreviewAnchor(null);
+    setPreviewLayout(null);
     setPreviewSelection(null);
     setPreviewContent("");
     setPreviewTruncated(false);
@@ -277,7 +311,7 @@ export function FileTreePanel({
 
   const closePreview = useCallback(() => {
     setPreviewPath(null);
-    setPreviewAnchor(null);
+    setPreviewLayout(null);
     setPreviewSelection(null);
     setPreviewContent("");
     setPreviewTruncated(false);
@@ -348,31 +382,80 @@ export function FileTreePanel({
     }
   }, [previewPath, previewKind, resolvePath]);
 
+  const buildPreviewLayout = useCallback(
+    (target: HTMLElement): FilePreviewLayout => {
+      const rect = target.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const isNarrow = isNarrowPreviewViewport;
+
+      if (isNarrow) {
+        const width = Math.min(
+          PREVIEW_PHONE_MAX_WIDTH_PX,
+          Math.max(280, viewportWidth - PREVIEW_VIEWPORT_PADDING_PX * 2),
+        );
+        const maxHeight = Math.max(
+          240,
+          Math.min(
+            viewportHeight - PREVIEW_VIEWPORT_PADDING_PX * 2,
+            Math.round(viewportHeight * PREVIEW_PHONE_MAX_HEIGHT_VH),
+          ),
+        );
+        return {
+          presentation: "constrained",
+          width,
+          maxHeight,
+          top: Math.max(
+            PREVIEW_VIEWPORT_PADDING_PX,
+            Math.round((viewportHeight - maxHeight) / 2),
+          ),
+          left: Math.max(
+            PREVIEW_VIEWPORT_PADDING_PX,
+            Math.round((viewportWidth - width) / 2),
+          ),
+        };
+      }
+
+      const width = Math.min(
+        PREVIEW_DESKTOP_WIDTH_PX,
+        Math.max(320, viewportWidth - PREVIEW_DESKTOP_PADDING_PX * 2),
+      );
+      const maxHeight = Math.min(
+        PREVIEW_DESKTOP_HEIGHT_PX,
+        viewportHeight - PREVIEW_DESKTOP_PADDING_PX * 2,
+      );
+      const left = Math.min(
+        Math.max(PREVIEW_DESKTOP_PADDING_PX, rect.left - width - PREVIEW_DESKTOP_PADDING_PX),
+        Math.max(PREVIEW_DESKTOP_PADDING_PX, viewportWidth - width - PREVIEW_DESKTOP_PADDING_PX),
+      );
+      const top = Math.min(
+        Math.max(PREVIEW_DESKTOP_PADDING_PX, rect.top - maxHeight * 0.35),
+        Math.max(PREVIEW_DESKTOP_PADDING_PX, viewportHeight - maxHeight - PREVIEW_DESKTOP_PADDING_PX),
+      );
+      const arrowTop = Math.min(
+        Math.max(16, rect.top + rect.height / 2 - top),
+        Math.max(16, maxHeight - 16),
+      );
+      return {
+        presentation: "anchored",
+        top,
+        left,
+        width,
+        maxHeight,
+        arrowTop,
+      };
+    },
+    [isNarrowPreviewViewport],
+  );
+
   const openPreview = useCallback((path: string, target: HTMLElement) => {
-    const rect = target.getBoundingClientRect();
-    const estimatedWidth = 640;
-    const estimatedHeight = 520;
-    const padding = 16;
-    const maxHeight = Math.min(estimatedHeight, window.innerHeight - padding * 2);
-    const left = Math.min(
-      Math.max(padding, rect.left - estimatedWidth - padding),
-      Math.max(padding, window.innerWidth - estimatedWidth - padding),
-    );
-    const top = Math.min(
-      Math.max(padding, rect.top - maxHeight * 0.35),
-      Math.max(padding, window.innerHeight - maxHeight - padding),
-    );
-    const arrowTop = Math.min(
-      Math.max(16, rect.top + rect.height / 2 - top),
-      Math.max(16, maxHeight - 16),
-    );
     setPreviewPath(path);
-    setPreviewAnchor({ top, left, arrowTop, height: maxHeight });
+    setPreviewLayout(buildPreviewLayout(target));
     setPreviewSelection(null);
     setIsDragSelecting(false);
     dragAnchorLineRef.current = null;
     dragMovedRef.current = false;
-  }, []);
+  }, [buildPreviewLayout]);
 
   useEffect(() => {
     if (!previewPath) {
@@ -763,13 +846,14 @@ export function FileTreePanel({
           </div>
         )}
       </div>
-      {previewPath && previewAnchor
+      {previewPath && previewLayout
         ? createPortal(
             <FilePreviewPopover
               path={previewPath}
               absolutePath={resolvePath(previewPath)}
               content={previewContent}
               truncated={previewTruncated}
+              presentation={previewLayout.presentation}
               previewKind={previewKind}
               imageSrc={previewImageSrc}
               openTargets={openTargets}
@@ -785,14 +869,15 @@ export function FileTreePanel({
               onAddSelection={handleAddSelection}
               canInsertText={canInsertText}
               onClose={closePreview}
+              onBackdropClick={closePreview}
               selectionHints={selectionHints}
               style={{
                 position: "fixed",
-                top: previewAnchor.top,
-                left: previewAnchor.left,
-                width: 640,
-                maxHeight: previewAnchor.height,
-                ["--file-preview-arrow-top" as string]: `${previewAnchor.arrowTop}px`,
+                top: previewLayout.top,
+                left: previewLayout.left,
+                width: previewLayout.width,
+                maxHeight: previewLayout.maxHeight,
+                ["--file-preview-arrow-top" as string]: `${previewLayout.arrowTop ?? 16}px`,
               }}
               isLoading={previewLoading}
               error={previewError}
