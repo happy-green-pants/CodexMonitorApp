@@ -145,6 +145,22 @@ Release build:
 npm run tauri:build
 ```
 
+Backend daemon release build (main workspace only):
+
+```bash
+# 必须在主工作区 /www/wwwroot/CodexMonitor 执行
+cargo build --release --bin codex_monitor_daemon --manifest-path src-tauri/Cargo.toml
+
+# 产物路径
+ls -l src-tauri/target/release/codex_monitor_daemon
+
+# 最小可执行性验证
+src-tauri/target/release/codex_monitor_daemon --help
+
+# 需要前台启动时使用脚本
+bash scripts/start_codex_monitor_daemon.sh
+```
+
 Focused test runs:
 
 ```bash

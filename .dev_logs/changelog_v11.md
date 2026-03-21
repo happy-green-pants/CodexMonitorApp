@@ -2,6 +2,14 @@ State Summary (from `changelog_v10.md`):
 - 已完成前端自定义模型补全：`customModelIds` 持久化、Settings 中的 fallback 维护 UI、模型列表“服务端优先 / config 次之 / 自定义最后”的统一合并逻辑已落地并补齐测试。
 - `.worktrees/` 已加入 `.gitignore`，仓库支持本地 worktree 开发而不污染版本控制。
 
+---
+### [2026-03-20 10:22] | Agent: Claude Code (Sonnet 4.6)
+- **File**: `/AGENTS.md`
+- **Change**: 在 Quick Runbook 中新增“Backend daemon release build (main workspace only)”流程，明确必须在主工作区执行、构建命令、产物路径、`--help` 验证与脚本启动方式。
+- **Why**: 之前在 worktree 构建导致主目录脚本找不到产物，需固化主工作区打包流程并作为默认执行路径。
+- **Goal**: 让后续“打包后端服务”请求直接按主工作区流程生成 `codex_monitor_daemon` release 二进制。
+---
+
 # Changelog v11
 
 ---
