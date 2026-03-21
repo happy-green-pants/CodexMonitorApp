@@ -2,12 +2,12 @@
 
 ## Active Changelog
 
-- Current: `/.dev_logs/changelog_v11.md`
+- Current: `/.dev_logs/changelog_v12.md`
 
 ## Current Task
 
-- Git/Files 文件预览移动端浮层适配
-- Goal: 修复底部 Git/Files 面板中文件预览在窄屏下超出视口、难以关闭、无法完整浏览的问题；移动端改为受限浮层+遮罩，桌面端保持现有锚点预览体验。
+- 远程 Git 继承系统全局身份修复
+- Goal: 修复远程 HTTP/TCP 连接下 Git 子进程只读取 app-managed `safe.directory` 配置、却丢失服务端系统 `user.name` / `user.email` 的问题；保持现有 ownership/safe.directory 兼容能力，同时恢复对系统全局 Git 身份与 XDG Git 配置的继承。
 
 ## Notes
 
