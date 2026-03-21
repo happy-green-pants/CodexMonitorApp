@@ -1,13 +1,69 @@
 # CodexMonitorApp
-![alt text](72a45c699799880ab4130839dfc64d9e.jpeg)
-![alt text](4f4218f3ca833ea14827bb8e0174d87b.jpeg)
-![alt text](f6f36333323fc38b83c102848baefca1.jpeg)
-
-# CodexMonitor
 
 ![CodexMonitor](screenshot.png)
 
+> **基于 [Dimillian/CodexMonitor](https://github.com/Dimillian/CodexMonitor) 二次开发，全程使用 AI 辅助开发**
+>
+> **开源协议：[MIT License](LICENSE)** - 可以自由使用、修改、分发
+
 CodexMonitor is a Tauri app for orchestrating multiple Codex agents across local workspaces. It provides a sidebar to manage projects, a home screen for quick actions, and a conversation view backed by the Codex app-server protocol.
+
+## Daemon Backend
+
+独立的 daemon 后端服务，可以运行在远程服务器上，支持以下平台：
+
+### 支持的平台
+- **Linux x86_64** - `codex_monitor_daemon-linux-x86_64` (~10-15 MB)
+- **Linux ARM64** - `codex_monitor_daemon-linux-aarch64` (~10-15 MB)
+- **macOS x86_64** (Intel) - `codex_monitor_daemon-macos-x86_64` (~10-15 MB)
+- **macOS ARM64** (Apple Silicon) - `codex_monitor_daemon-macos-aarch64` (~10-15 MB)
+- **Windows x86_64** - `codex_monitor_daemon-windows-x86_64.exe` (~10-15 MB)
+
+### 命令行参数
+
+```
+USAGE:
+  codex_monitor_daemon [--listen <addr>] [--http-listen <addr>] [--data-dir <path>] [--token <token> | --insecure-no-auth]
+
+OPTIONS:
+  --listen <addr>          TCP 监听地址（默认: 127.0.0.1:4732）
+  --http-listen <addr>     HTTP/WS 监听地址（可选，用于浏览器访问）
+  --data-dir <path>        数据目录路径（存储 workspaces.json 和 settings.json）
+  --token <token>          认证令牌（TCP 客户端必需）
+  --insecure-no-auth       禁用认证（仅开发环境使用）
+  -h, --help               显示帮助信息
+```
+
+### 环境变量
+
+可以通过环境变量设置认证令牌：
+
+```bash
+export CODEX_MONITOR_DAEMON_TOKEN=your-secret-token
+./codex_monitor_daemon
+```
+
+### 使用场景
+
+- **远程服务器部署**：在云服务器上运行，iOS 或远程客户端连接
+- **无 GUI 环境**：在无图形界面的服务器上运行
+- **后台服务**：配置为系统服务，开机自启动
+- **多用户访问**：多个客户端同时连接到同一个 daemon
+
+### 快速开始
+
+下载并运行：
+
+```bash
+# 下载对应平台的二进制文件
+wget https://github.com/happy-green-pants/CodexMonitorApp/releases/download/v1.0.0/codex_monitor_daemon-linux-x86_64
+chmod +x codex_monitor_daemon-linux-x86_64
+
+# 设置令牌并启动
+CODEX_MONITOR_DAEMON_TOKEN=your-secret-token ./codex_monitor_daemon-linux-x86_64
+```
+
+详细部署文档见下方的 [Daemon Deployment](#daemon-deployment) 章节。
 
 ## Features
 
@@ -228,27 +284,27 @@ The `codex_monitor_daemon` is a standalone backend service that can run independ
 
 ### Quick Start with Prebuilt Binaries
 
-Download the prebuilt binary for your platform from the [GitHub Releases](https://github.com/Dimillian/CodexMonitor/releases) page:
+Download the prebuilt binary for your platform from the [GitHub Releases](https://github.com/happy-green-pants/CodexMonitorApp/releases) page:
 
 ```bash
 # Linux x86_64
-wget https://github.com/Dimillian/CodexMonitor/releases/download/v1.0.0/codex_monitor_daemon-linux-x86_64
+wget https://github.com/happy-green-pants/CodexMonitorApp/releases/download/v1.0.0/codex_monitor_daemon-linux-x86_64
 chmod +x codex_monitor_daemon-linux-x86_64
 
 # Linux ARM64
-wget https://github.com/Dimillian/CodexMonitor/releases/download/v1.0.0/codex_monitor_daemon-linux-aarch64
+wget https://github.com/happy-green-pants/CodexMonitorApp/releases/download/v1.0.0/codex_monitor_daemon-linux-aarch64
 chmod +x codex_monitor_daemon-linux-aarch64
 
 # macOS x86_64
-wget https://github.com/Dimillian/CodexMonitor/releases/download/v1.0.0/codex_monitor_daemon-macos-x86_64
+wget https://github.com/happy-green-pants/CodexMonitorApp/releases/download/v1.0.0/codex_monitor_daemon-macos-x86_64
 chmod +x codex_monitor_daemon-macos-x86_64
 
 # macOS ARM64 (Apple Silicon)
-wget https://github.com/Dimillian/CodexMonitor/releases/download/v1.0.0/codex_monitor_daemon-macos-aarch64
+wget https://github.com/happy-green-pants/CodexMonitorApp/releases/download/v1.0.0/codex_monitor_daemon-macos-aarch64
 chmod +x codex_monitor_daemon-macos-aarch64
 
 # Windows x86_64
-wget https://github.com/Dimillian/CodexMonitor/releases/download/v1.0.0/codex_monitor_daemon-windows-x86_64.exe
+wget https://github.com/happy-green-pants/CodexMonitorApp/releases/download/v1.0.0/codex_monitor_daemon-windows-x86_64.exe
 ```
 
 ### Daemon Command-Line Options
@@ -465,7 +521,7 @@ The workflow will:
 ### Manual Release
 
 You can also manually trigger the workflow from GitHub Actions:
-1. Go to the [Actions](https://github.com/Dimillian/CodexMonitor/actions) tab
+1. Go to the [Actions](https://github.com/happy-green-pants/CodexMonitorApp/actions) tab
 2. Select "Release Daemon Binaries" workflow
 3. Click "Run workflow"
 4. Enter the tag name (e.g., `v1.0.0`)
@@ -473,7 +529,7 @@ You can also manually trigger the workflow from GitHub Actions:
 
 ### Available Binaries
 
-After the workflow completes, the following binaries will be available in the [GitHub Releases](https://github.com/Dimillian/CodexMonitor/releases):
+After the workflow completes, the following binaries will be available in the [GitHub Releases](https://github.com/happy-green-pants/CodexMonitorApp/releases):
 - `codex_monitor_daemon-linux-x86_64` (~10-15 MB)
 - `codex_monitor_daemon-linux-aarch64` (~10-15 MB)
 - `codex_monitor_daemon-macos-x86_64` (~10-15 MB)
