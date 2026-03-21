@@ -1,6 +1,7 @@
 # CodexMonitorApp
-
-![CodexMonitor](screenshot.png)
+![alt text](72a45c699799880ab4130839dfc64d9e.jpeg)
+![alt text](4f4218f3ca833ea14827bb8e0174d87b.jpeg)
+![alt text](f6f36333323fc38b83c102848baefca1.jpeg)
 
 > **基于 [Dimillian/CodexMonitor](https://github.com/Dimillian/CodexMonitor) 二次开发，全程使用 AI 辅助开发**
 >
