@@ -88,3 +88,9 @@ State Summary (from `changelog_v10.md`):
 - **Change**: 先补失败测试再实现：新增 `FilePreviewPopover` 受限浮层遮罩测试；新增 `FileTreePanel` 窄屏文本/图片预览测试，覆盖受限浮层渲染、遮罩关闭、图片预览仍走同一小屏容器等回归场景。
 - **Why**: 该问题直接影响移动端可用性，需要用测试锁定“可关闭 + 可浏览 + 图片文本一致”的交互契约，避免后续样式回退。
 - **Goal**: 为移动端文件预览适配建立自动化保护网，并按 TDD 证明修复针对的正是本次窄屏问题。
+---
+### [2026-03-21 10:08] | Agent: Codex (GPT-5)
+- **File**: `/.dev_logs/manifest.md`, `.github/workflows/release.yml`, `.github/workflows/release-daemon-binaries.yml`
+- **Change**: 将 manifest 当前任务切换为 GitHub Actions Linux release 构建依赖修复；为 `release.yml` 的 Linux 打包步骤补充 `pkg-config` 与 `libglib2.0-dev`；为 `release-daemon-binaries.yml` 的 Linux 构建步骤同步补充相同基础依赖。
+- **Why**: GitHub Actions Ubuntu release runner 上 `glib-sys` 通过 `pkg-config` 查找 `glib-2.0 >= 2.70` 时失败，错误直接显示 `glib-2.0.pc` 缺失且 `PKG_CONFIG_PATH` 未设置；根因是工作流未安装对应系统开发包，而不是 Rust 代码或 Cargo 配置异常。
+- **Goal**: 恢复 Linux 平台 Tauri app / daemon 的发布构建能力，避免 release 与 daemon release 工作流在相同环境上反复出现 `glib-sys` 构建失败。

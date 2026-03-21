@@ -6,8 +6,8 @@
 
 ## Current Task
 
-- Git/Files 文件预览移动端浮层适配
-- Goal: 修复底部 Git/Files 面板中文件预览在窄屏下超出视口、难以关闭、无法完整浏览的问题；移动端改为受限浮层+遮罩，桌面端保持现有锚点预览体验。
+- GitHub Actions Linux release 构建补齐 glib 系统依赖
+- Goal: 修复 GitHub Actions 在 Ubuntu release 构建中因缺失 `glib-2.0.pc` / `pkg-config` 导致 `glib-sys` 自定义构建脚本失败的问题，恢复 Tauri app 与 daemon 的 Linux 发布链路。
 
 ## Notes
 
