@@ -352,6 +352,24 @@ Get-Content scripts\daemon.env | ForEach-Object { $var = $_.Split('='); [Environ
 .\scripts\start_daemon.ps1
 ```
 
+**Production Deployment Script:**
+
+参考 `scripts/start_codex_monitor_daemon.sh` 的生产环境部署示例:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+BIN="/path/to/codex_monitor_daemon"
+
+exec "$BIN" --http-listen 127.0.0.1:9010 --token 123456 --data-dir /home/user/.local/share/codex-monitor-daemon
+```
+
+参数说明:
+- `--http-listen 127.0.0.1:9010`: 启用 HTTP/WS 监听,用于浏览器访问
+- `--token 123456`: 设置认证令牌(请修改为强密码)
+- `--data-dir /home/user/.local/share/codex-monitor-daemon`: 指定数据目录路径
+
 #### Direct Execution
 
 Start the daemon with default settings:
