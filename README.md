@@ -213,6 +213,268 @@ Use the end-to-end script to archive, upload, configure compliance, assign beta 
 The script auto-loads release metadata from `.testflight.local.env` (gitignored).
 For new setups, copy `.testflight.local.env.example` to `.testflight.local.env` and fill values.
 
+## Daemon Deployment
+
+The `codex_monitor_daemon` is a standalone backend service that can run independently of the desktop app. It's ideal for:
+- Running Codex on a remote server
+- Headless deployments without a GUI
+- iOS remote backend access
+- Server-side automation
+
+### Quick Start with Prebuilt Binaries
+
+Download the prebuilt binary for your platform from the [GitHub Releases](https://github.com/Dimillian/CodexMonitor/releases) page:
+
+```bash
+# Linux x86_64
+wget https://github.com/Dimillian/CodexMonitor/releases/download/v1.0.0/codex_monitor_daemon-linux-x86_64
+chmod +x codex_monitor_daemon-linux-x86_64
+
+# Linux ARM64
+wget https://github.com/Dimillian/CodexMonitor/releases/download/v1.0.0/codex_monitor_daemon-linux-aarch64
+chmod +x codex_monitor_daemon-linux-aarch64
+
+# macOS x86_64
+wget https://github.com/Dimillian/CodexMonitor/releases/download/v1.0.0/codex_monitor_daemon-macos-x86_64
+chmod +x codex_monitor_daemon-macos-x86_64
+
+# macOS ARM64 (Apple Silicon)
+wget https://github.com/Dimillian/CodexMonitor/releases/download/v1.0.0/codex_monitor_daemon-macos-aarch64
+chmod +x codex_monitor_daemon-macos-aarch64
+
+# Windows x86_64
+wget https://github.com/Dimillian/CodexMonitor/releases/download/v1.0.0/codex_monitor_daemon-windows-x86_64.exe
+```
+
+### Daemon Command-Line Options
+
+```
+USAGE:
+  codex_monitor_daemon [--listen <addr>] [--http-listen <addr>] [--data-dir <path>] [--token <token> | --insecure-no-auth]
+
+OPTIONS:
+  --listen <addr>          Bind address for the TCP daemon (default: 127.0.0.1:4732)
+  --http-listen <addr>     Optional bind address for browser HTTP/WS access
+  --data-dir <path>        Data dir holding workspaces.json/settings.json
+  --token <token>          Shared token required by TCP clients
+  --insecure-no-auth       Disable TCP auth (dev only)
+  -h, --help               Show this help
+```
+
+### Basic Usage Examples
+
+#### Quick Start Scripts
+
+Use the provided convenience scripts to start the daemon:
+
+**Linux/macOS:**
+
+```bash
+# Set your token and start
+CODEX_MONITOR_DAEMON_TOKEN=your-secret-token ./scripts/start_daemon.sh
+
+# Or load from .env file
+source scripts/daemon.env
+./scripts/start_daemon.sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+# Set your token and start
+$env:CODEX_MONITOR_DAEMON_TOKEN='your-secret-token'
+.\scripts\start_daemon.ps1
+
+# Or load from .env file
+Get-Content scripts\daemon.env | ForEach-Object { $var = $_.Split('='); [Environment]::SetEnvironmentVariable($var[0], $var[1]) }
+.\scripts\start_daemon.ps1
+```
+
+#### Direct Execution
+
+Start the daemon with default settings:
+
+```bash
+./codex_monitor_daemon-linux-x86_64 --token your-secret-token
+```
+
+Start with HTTP access enabled:
+
+```bash
+./codex_monitor_daemon-linux-x86_64 \
+  --token your-secret-token \
+  --http-listen 0.0.0.0:9010
+```
+
+Start with custom data directory:
+
+```bash
+./codex_monitor_daemon-linux-x86_64 \
+  --token your-secret-token \
+  --data-dir /opt/codex-monitor-daemon
+```
+
+Start with custom TCP listen address:
+
+```bash
+./codex_monitor_daemon-linux-x86_64 \
+  --token your-secret-token \
+  --listen 0.0.0.0:4732
+```
+
+### Environment Variables
+
+You can also set the token via environment variable:
+
+```bash
+export CODEX_MONITOR_DAEMON_TOKEN=your-secret-token
+./codex_monitor_daemon-linux-x86_64
+```
+
+### Running as a System Service
+
+#### Linux (systemd)
+
+Create a systemd service file at `/etc/systemd/system/codex-monitor-daemon.service`:
+
+```ini
+[Unit]
+Description=Codex Monitor Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/opt/codex-monitor-daemon
+ExecStart=/opt/codex-monitor-daemon/codex_monitor_daemon-linux-x86_64 \
+  --token your-secret-token \
+  --data-dir /opt/codex-monitor-daemon/data \
+  --listen 0.0.0.0:4732
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start the service:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable codex-monitor-daemon
+sudo systemctl start codex-monitor-daemon
+sudo systemctl status codex-monitor-daemon
+```
+
+#### macOS (launchd)
+
+Create a launchd plist file at `~/Library/LaunchAgents/com.codexmonitor.daemon.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.codexmonitor.daemon</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/codex_monitor_daemon-macos-aarch64</string>
+        <string>--token</string>
+        <string>your-secret-token</string>
+        <string>--data-dir</string>
+        <string>/usr/local/var/codex-monitor-daemon</string>
+        <string>--listen</string>
+        <string>0.0.0.0:4732</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>
+```
+
+Load and start the service:
+
+```bash
+launchctl load ~/Library/LaunchAgents/com.codexmonitor.daemon.plist
+launchctl start com.codexmonitor.daemon
+```
+
+#### Windows (NSSM)
+
+Install [NSSM](https://nssm.cc/) and create a service:
+
+```powershell
+nssm install CodexMonitorDaemon "C:\codex-monitor-daemon\codex_monitor_daemon-windows-x86_64.exe"
+nssm set CodexMonitorDaemon AppParameters "--token your-secret-token --data-dir C:\codex-monitor-daemon\data --listen 0.0.0.0:4732"
+nssm set CodexMonitorDaemon AppDirectory "C:\codex-monitor-daemon"
+nssm set CodexMonitorDaemon DisplayName "Codex Monitor Daemon"
+nssm set CodexMonitorDaemon Description "Codex Monitor backend service"
+nssm set CodexMonitorDaemon Start SERVICE_AUTO_START
+nssm start CodexMonitorDaemon
+```
+
+### Connecting from CodexMonitor App
+
+Once the daemon is running, configure your CodexMonitor app to connect to it:
+
+1. Open CodexMonitor
+2. Go to `Settings > Server`
+3. Set `Remote backend host` to your daemon address (e.g., `your-server.com:4732`)
+4. Set `Remote backend token` to match your daemon's `--token` value
+5. Click `Connect & test` to verify the connection
+
+### Building from Source
+
+If you prefer to build the daemon from source:
+
+```bash
+cd src-tauri
+cargo build --release --bin codex_monitor_daemon
+```
+
+The binary will be at `src-tauri/target/release/codex_monitor_daemon` (or `.exe` on Windows).
+
+## 🚀 Using GitHub Actions Release
+
+The daemon binaries are automatically built and uploaded when you push a version tag to GitHub.
+
+### Automatic Release (Recommended)
+
+Simply push a version tag to trigger the automated build:
+
+```bash
+# Create and push a new version tag
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The workflow will:
+1. Automatically detect the tag
+2. Build daemon binaries for all 5 platforms
+3. Upload them to the corresponding GitHub Release
+
+### Manual Release
+
+You can also manually trigger the workflow from GitHub Actions:
+1. Go to the [Actions](https://github.com/Dimillian/CodexMonitor/actions) tab
+2. Select "Release Daemon Binaries" workflow
+3. Click "Run workflow"
+4. Enter the tag name (e.g., `v1.0.0`)
+5. Wait for the build to complete
+
+### Available Binaries
+
+After the workflow completes, the following binaries will be available in the [GitHub Releases](https://github.com/Dimillian/CodexMonitor/releases):
+- `codex_monitor_daemon-linux-x86_64` (~10-15 MB)
+- `codex_monitor_daemon-linux-aarch64` (~10-15 MB)
+- `codex_monitor_daemon-macos-x86_64` (~10-15 MB)
+- `codex_monitor_daemon-macos-aarch64` (~10-15 MB)
+- `codex_monitor_daemon-windows-x86_64.exe` (~10-15 MB)
+
 ## Release Build
 
 Build the production Tauri bundle:
