@@ -6,8 +6,8 @@
 
 ## Current Task
 
-- GitHub Actions daemon Linux 发布构建修复
-- Goal: 修复 `release-daemon-binaries` 中 Linux x86_64 缺少 GTK/WebKit 依赖与 Linux aarch64 交叉编译 `pkg-config` 失败的问题，恢复 daemon 发布工作流。
+- GitHub Actions release 接入 Android APK 打包
+- Goal: 将现有 Capacitor Android release APK 构建并入 `release.yml`，在 GitHub Actions 中统一产出并上传开源分发用 APK。
 
 ## Notes
 

@@ -22,3 +22,15 @@ State Summary (from `changelog_v11.md`):
 - **Change**: 运行静态验证：先用 `git diff --check` 检查改动，发现文件为 `CRLF` 导致的尾随空白噪声；随后统一转换为 `LF`，为最终交付恢复干净 diff 基线。
 - **Why**: 若不先消除行尾格式噪声，CI 修复本身会被 diff 质量问题掩盖，且不利于后续 review 聚焦有效变更。
 - **Goal**: 确保本次 workflow 修复具备可审查、可提交的最小差异形态。
+---
+### [2026-03-21 11:02] | Agent: Codex (GPT-5)
+- **File**: `/.dev_logs/manifest.md`, `.github/workflows/release.yml`
+- **Change**: 将 manifest 当前任务切换为 Android APK 发布接入；在统一 `release.yml` 中新增 `build_android` job，使用 Node 22、JDK 21、Android SDK 运行 `npm run build`、`npx --yes @capacitor/cli@8.2.0 sync android`、`./gradlew assembleRelease`，并将 release APK 重命名为 `CodexMonitor_<version>_android.apk` 后上传为 workflow artifact。
+- **Why**: 仓库已具备 Capacitor Android 工程与 release keystore，本次需求是将现有开源 APK 打包流程并入 GitHub Actions，而不是新增上架或 AAB 分发链路。
+- **Goal**: 让桌面端与 Android APK 在同一条 `release.yml` 中统一构建，减少手工打包与单独上传步骤。
+---
+### [2026-03-21 11:02] | Agent: Codex (GPT-5)
+- **File**: `.github/workflows/release.yml`
+- **Change**: 在 `release` job 中新增 Android artifact 下载与校验逻辑，并将 `*_android.apk` 一并附加到 `gh release create` 上传列表。
+- **Why**: 仅构建 APK 不足以完成开源发布；必须将 Android 产物接入现有 release 聚合步骤，才能和 macOS/Linux/Windows 安装包一起出现在 GitHub Release 页面。
+- **Goal**: 让每次统一发布都自动携带可直接下载安装的 Android release APK。
