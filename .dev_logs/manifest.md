@@ -17,3 +17,4 @@
 - `changelog_v2.md` reached >5 modules; start `changelog_v3.md` for ongoing work.
 - `changelog_v3.md` exceeded 100 lines; start `changelog_v4.md` for startup request-storm stabilization work.
 - `changelog_v5.md` exceeded 100 lines; start `changelog_v6.md` for image picker runtime compatibility work.
+- `changelog_v11.md` approached the 100-line limit; start `changelog_v12.md` for daemon Linux release workflow fixes.
