@@ -55,3 +55,9 @@ State Summary (from `changelog_v11.md`):
 - **Change**: 根据代码审查再次收敛 Git runtime：去掉 app-managed XDG 对系统 XDG 配置的重复 include，只保留 app-managed global 对系统 XDG + `~/.gitconfig` 的一次性继承，并新增“global 同键优先于 XDG”“XDG 独有邮箱仍可读到”的回归测试。
 - **Why**: 若系统 XDG 配置在 global include 与 app-managed XDG 中被重复加载，会改变 Git 原生优先级，让 `user.name`/`credential.helper` 等同键被 XDG 值错误覆盖。
 - **Goal**: 既恢复远程 Git 身份继承，又严格保持服务端现有 Git 配置的原生优先级与行为。
+---
+### [2026-03-22 12:23] | Agent: Codex (GPT-5)
+- **File**: `/.dev_logs/manifest.md`, `/.dev_logs/changelog_v12.md`, `.github/workflows/release.yml`, `.github/workflows/release-daemon-binaries.yml`, `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `android/app/build.gradle`
+- **Change**: 将当前任务切换为 `v1.0.1` 发版；把 `Release` 工作流从仅手动触发改为支持 `v*` tag 自动触发，修复 `latest.json` 和 updater 仍指向上游 `Dimillian/CodexMonitor` 的错误仓库地址，并将 release 上传逻辑改为“Release 已存在则 `upload --clobber`，否则 `create`”；同时为 `release-daemon-binaries.yml` 增加等待主 Release 出现的轮询，避免 daemon 工作流比主 release 更早执行时上传失败；统一桌面、Rust、lockfile 与 Android 版本到 `1.0.1`，并将 Android `versionCode` 提升到 `5` 以满足升级要求。
+- **Why**: 用户要求直接发布 `v1.0.1`，且产物必须同时包含桌面包、安卓 APK 和 daemon 二进制；当前仓库虽然已有 APK 构建，但 `release.yml` 不会随 tag 自动触发，daemon 工作流还依赖“主 Release 已存在”的隐含前提，并且 updater/release URL 仍指向上游仓库，直接打 tag 会导致发布链路不完整或失效。
+- **Goal**: 让推送 `v1.0.1` tag 后，GitHub 能自动生成并汇总桌面安装包、Android release APK 与 daemon 二进制，并保证应用更新元数据指向当前开源仓库。

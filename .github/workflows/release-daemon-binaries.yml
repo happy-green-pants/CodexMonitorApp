@@ -127,6 +127,20 @@ jobs:
             TAG="${GITHUB_REF#refs/tags/}"
           fi
 
+          echo "Waiting for release $TAG to be available"
+
+          for attempt in $(seq 1 40); do
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "Release $TAG is ready"
+              break
+            fi
+            if [ "$attempt" -eq 40 ]; then
+              echo "Release $TAG not found after waiting"
+              exit 1
+            fi
+            sleep 15
+          done
+
           echo "Uploading daemon binaries to release $TAG"
 
           for dir in artifacts/daemon-*; do

@@ -6,8 +6,8 @@
 
 ## Current Task
 
-- 远程 Git 继承系统全局身份修复
-- Goal: 修复远程 HTTP/TCP 连接下 Git 子进程只读取 app-managed `safe.directory` 配置、却丢失服务端系统 `user.name` / `user.email` 的问题；保持现有 ownership/safe.directory 兼容能力，同时恢复对系统全局 Git 身份与 XDG Git 配置的继承。
+- v1.0.1 发布链路修复与发版
+- Goal: 统一桌面、Rust 与 Android 版本号为 1.0.1，修复 GitHub Release 自动触发、updater 链接和 daemon 上传竞态问题，并通过推送 `v1.0.1` tag 自动产出桌面包、安卓 APK 与 daemon 二进制。
 
 ## Notes
 

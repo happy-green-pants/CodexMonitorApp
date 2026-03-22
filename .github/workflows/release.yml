@@ -1,6 +1,9 @@
 name: Release
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -534,7 +537,7 @@ jobs:
           artifacts_dir = Path("release-artifacts")
 
           def release_url(filename):
-            return f"https://github.com/Dimillian/CodexMonitor/releases/download/v${VERSION}/{quote(filename)}"
+            return f"https://github.com/happy-green-pants/CodexMonitorApp/releases/download/v${VERSION}/{quote(filename)}"
 
           platforms = {
             "darwin-aarch64": {
@@ -680,20 +683,35 @@ jobs:
             exit 1
           fi
 
-          gh release create "v${VERSION}" \
-            --title "v${VERSION}" \
-            --notes-file release-artifacts/release-notes.md \
-            --target "$GITHUB_SHA" \
-            release-artifacts/CodexMonitor.zip \
-            release-artifacts/CodexMonitor_*_aarch64.dmg \
-            release-artifacts/CodexMonitor.app.tar.gz \
-            release-artifacts/CodexMonitor.app.tar.gz.sig \
-            "${appimages[@]}" \
-            "${rpms[@]}" \
-            "${windows_exes[@]}" \
-            "${windows_msis[@]}" \
-            "${android_apks[@]}" \
-            release-artifacts/latest.json
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            gh release upload "v${VERSION}" \
+              --clobber \
+              release-artifacts/CodexMonitor.zip \
+              release-artifacts/CodexMonitor_*_aarch64.dmg \
+              release-artifacts/CodexMonitor.app.tar.gz \
+              release-artifacts/CodexMonitor.app.tar.gz.sig \
+              "${appimages[@]}" \
+              "${rpms[@]}" \
+              "${windows_exes[@]}" \
+              "${windows_msis[@]}" \
+              "${android_apks[@]}" \
+              release-artifacts/latest.json
+          else
+            gh release create "v${VERSION}" \
+              --title "v${VERSION}" \
+              --notes-file release-artifacts/release-notes.md \
+              --target "$GITHUB_SHA" \
+              release-artifacts/CodexMonitor.zip \
+              release-artifacts/CodexMonitor_*_aarch64.dmg \
+              release-artifacts/CodexMonitor.app.tar.gz \
+              release-artifacts/CodexMonitor.app.tar.gz.sig \
+              "${appimages[@]}" \
+              "${rpms[@]}" \
+              "${windows_exes[@]}" \
+              "${windows_msis[@]}" \
+              "${android_apks[@]}" \
+              release-artifacts/latest.json
+          fi
 
       - name: Bump version and open PR
         env:
