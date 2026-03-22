@@ -6,8 +6,8 @@
 
 ## Current Task
 
-- v1.0.1 发布链路修复与发版
-- Goal: 统一桌面、Rust 与 Android 版本号为 1.0.1，修复 GitHub Release 自动触发、updater 链接和 daemon 上传竞态问题，并通过推送 `v1.0.1` tag 自动产出桌面包、安卓 APK 与 daemon 二进制。
+- v1.0.0 自动发布收敛与重发
+- Goal: 在不回退 main 主线 1.0.1 演进的前提下，生成一个仅用于现有 `v1.0.0` Release 的自动发布提交，上传 Android APK 与 daemon 二进制，并避免桌面 bundle 流程继续阻断发布。
 
 ## Notes
 

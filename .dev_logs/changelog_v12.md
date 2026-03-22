@@ -61,3 +61,9 @@ State Summary (from `changelog_v11.md`):
 - **Change**: 将当前任务切换为 `v1.0.1` 发版；把 `Release` 工作流从仅手动触发改为支持 `v*` tag 自动触发，修复 `latest.json` 和 updater 仍指向上游 `Dimillian/CodexMonitor` 的错误仓库地址，并将 release 上传逻辑改为“Release 已存在则 `upload --clobber`，否则 `create`”；同时为 `release-daemon-binaries.yml` 增加等待主 Release 出现的轮询，避免 daemon 工作流比主 release 更早执行时上传失败；统一桌面、Rust、lockfile 与 Android 版本到 `1.0.1`，并将 Android `versionCode` 提升到 `5` 以满足升级要求。
 - **Why**: 用户要求直接发布 `v1.0.1`，且产物必须同时包含桌面包、安卓 APK 和 daemon 二进制；当前仓库虽然已有 APK 构建，但 `release.yml` 不会随 tag 自动触发，daemon 工作流还依赖“主 Release 已存在”的隐含前提，并且 updater/release URL 仍指向上游仓库，直接打 tag 会导致发布链路不完整或失效。
 - **Goal**: 让推送 `v1.0.1` tag 后，GitHub 能自动生成并汇总桌面安装包、Android release APK 与 daemon 二进制，并保证应用更新元数据指向当前开源仓库。
+---
+### [2026-03-22 13:28] | Agent: Codex (GPT-5)
+- **File**: `/.dev_logs/manifest.md`, `/.dev_logs/changelog_v12.md`, `.github/workflows/release.yml`, `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `android/app/build.gradle`
+- **Change**: 基于用户要求改为重发现有 `v1.0.0` Release，在临时发布分支中将桌面、Rust 与 Android 显示版本回落到 `1.0.0`，并把 Android `versionCode` 提升到 `6` 以保证安装升级序列继续单调递增；同时将主 `release.yml` 收敛为“仅构建并上传 Android APK”的最小工作流，移除会阻断发布的 macOS/Linux/Windows 桌面 bundle 聚合链路，保留独立 `release-daemon-binaries.yml` 继续附加 daemon 二进制到同一 tag release。
+- **Why**: 现有 `v1.0.0` Release 已由用户手工清空产物并保留标题；此前 `v1.0.1` 自动发布实际已验证 APK 构建成功，但主 Release 被 macOS 签名与 Linux bundle 失败阻断。当前目标不是解决所有桌面包问题，而是优先把用户真正需要的 Android APK 与 daemon 二进制稳定上传到现有 `v1.0.0` Release。
+- **Goal**: 通过重置 `v1.0.0` 标签到这次最小发布提交，自动把 `CodexMonitor_1.0.0_android.apk` 与 daemon 二进制重新挂载到 GitHub 上已经存在的 `v1.0.0` Release。
