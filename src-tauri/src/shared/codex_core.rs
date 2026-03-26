@@ -761,7 +761,37 @@ pub(crate) async fn respond_to_server_request_core(
     result: Value,
 ) -> Result<(), String> {
     let session = get_session_clone(sessions, &workspace_id).await?;
-    session.send_response(request_id, result).await
+    let request_id_key = request_id
+        .as_u64()
+        .map(|value| value.to_string())
+        .or_else(|| request_id.as_i64().map(|value| value.to_string()))
+        .or_else(|| {
+            request_id
+                .as_str()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+        });
+    session.send_response(request_id, result).await?;
+    if let Some(request_id_key) = request_id_key {
+        session
+            .pending_server_requests
+            .lock()
+            .await
+            .remove(&request_id_key);
+    }
+    Ok(())
+}
+
+pub(crate) async fn list_pending_server_requests_core(
+    sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
+    workspace_id: String,
+    thread_id: Option<String>,
+) -> Result<Value, String> {
+    let session = get_session_clone(sessions, &workspace_id).await?;
+    Ok(session
+        .list_pending_server_requests(&workspace_id, thread_id.as_deref())
+        .await)
 }
 
 pub(crate) async fn remember_approval_rule_core(

@@ -16,6 +16,7 @@ import type {
   RequestUserInputResponse,
 } from "../../../types";
 import { isPlanReadyTaggedMessage } from "../../../utils/internalPlanReadyMessages";
+import { isMobilePlatform } from "../../../utils/platformPaths";
 import { PlanReadyFollowupMessage } from "../../app/components/PlanReadyFollowupMessage";
 import { RequestUserInputMessage } from "../../app/components/RequestUserInputMessage";
 import { useFileLinkOpener } from "../hooks/useFileLinkOpener";
@@ -47,6 +48,10 @@ type MessagesProps = {
   processingStartedAt?: number | null;
   lastDurationMs?: number | null;
   showPollingFetchStatus?: boolean;
+  showReconnectBanner?: boolean;
+  reconnectLoading?: boolean;
+  reconnectLabel?: string;
+  onReconnectAndSync?: () => void;
   pollingIntervalMs?: number;
   workspacePath?: string | null;
   openTargets: OpenAppTarget[];
@@ -85,6 +90,10 @@ export const Messages = memo(function Messages({
   processingStartedAt = null,
   lastDurationMs = null,
   showPollingFetchStatus = false,
+  showReconnectBanner = false,
+  reconnectLoading = false,
+  reconnectLabel = "Reconnect and Sync",
+  onReconnectAndSync,
   pollingIntervalMs = 12000,
   workspacePath = null,
   openTargets,
@@ -116,6 +125,9 @@ export const Messages = memo(function Messages({
             (!workspaceId || request.workspace_id === workspaceId),
         )?.request_id ?? null)
       : null;
+  const shouldShowReconnectBanner =
+    showReconnectBanner ||
+    (isMobilePlatform() && showPollingFetchStatus && Boolean(onReconnectAndSync));
   const scrollKey = `${scrollKeyForItems(items)}-${activeUserInputRequestId ?? "no-input"}`;
   const { openFileLink, showFileLinkMenu } = useFileLinkOpener(
     workspacePath,
@@ -518,6 +530,22 @@ export const Messages = memo(function Messages({
       })}
       {planFollowupNode}
       {userInputNode}
+      {shouldShowReconnectBanner ? (
+        <div className="messages-reconnect-banner" role="status" aria-live="polite">
+          <div className="messages-reconnect-copy">
+            Connection recovery is available for this thread.
+          </div>
+          <button
+            type="button"
+            className="messages-reconnect-button"
+            onClick={() => onReconnectAndSync?.()}
+            disabled={reconnectLoading}
+            aria-label={reconnectLabel}
+          >
+            {reconnectLoading ? "Syncing…" : reconnectLabel}
+          </button>
+        </div>
+      ) : null}
       <WorkingIndicator
         isThinking={isThinking}
         processingStartedAt={processingStartedAt}

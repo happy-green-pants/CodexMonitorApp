@@ -97,6 +97,7 @@ These arrive on the same frontend event stream but are not Codex v2
   `item/permissions/requestApproval`, via suffix match in
   `isApprovalRequestMethod(method)`
 - `item/tool/requestUserInput` (a Codex v2 server request, not a notification)
+- `serverRequest/resolved` (used to clear recovered pending server requests)
 - `codex/backgroundThread` (CodexMonitor synthetic bridge event)
 - `codex/connected` (CodexMonitor synthetic bridge event)
 - `codex/event/skills_update_available` (handled via
@@ -129,7 +130,6 @@ events are currently not routed:
 - `mcpServer/oauthLogin/completed`
 - `model/rerouted`
 - `rawResponseItem/completed`
-- `serverRequest/resolved`
 - `skills/changed`
 - `thread/compacted` (deprecated; intentionally not routed)
 - `thread/realtime/closed`
@@ -165,6 +165,7 @@ These are v2 request methods CodexMonitor currently sends to Codex app-server:
 - `account/read`
 - `skills/list`
 - `app/list`
+- `list_pending_server_requests` (CodexMonitor-only recovery helper backed by cached app-server requests)
 
 Notes:
 - `turn/start` now forwards the optional `serviceTier` override (`"fast"` for `/fast`, `null` for default/off) alongside `model`, `effort`, and `collaborationMode`.
@@ -220,6 +221,13 @@ Supported server requests:
 - `item/fileChange/requestApproval`
 - `item/permissions/requestApproval`
 - `item/tool/requestUserInput`
+
+Related recovery support:
+
+- CodexMonitor now caches inbound approval and `item/tool/requestUserInput`
+  requests in the backend session layer.
+- Frontend recovery can query `list_pending_server_requests` and rehydrate
+  pending approvals / input prompts after reconnect or app resume.
 
 Missing server requests:
 

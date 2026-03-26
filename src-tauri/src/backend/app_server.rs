@@ -410,6 +410,44 @@ fn should_broadcast_global_workspace_notification(
         && request_workspace.is_none()
 }
 
+fn is_pending_server_request_method(method: &str) -> bool {
+    method.ends_with("requestApproval") || method == "item/tool/requestUserInput"
+}
+
+fn normalize_request_id_key(value: &Value) -> Option<String> {
+    if let Some(id) = value.get("id").and_then(Value::as_u64) {
+        return Some(id.to_string());
+    }
+    if let Some(id) = value.get("id").and_then(Value::as_i64) {
+        return Some(id.to_string());
+    }
+    value.get("id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn request_id_key_from_value(value: &Value) -> Option<String> {
+    if let Some(id) = value.as_u64() {
+        return Some(id.to_string());
+    }
+    if let Some(id) = value.as_i64() {
+        return Some(id.to_string());
+    }
+    value.as_str()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn request_id_key_from_message(value: &Value) -> Option<String> {
+    value
+        .get("params")
+        .and_then(|params| params.get("requestId").or_else(|| params.get("request_id")))
+        .and_then(request_id_key_from_value)
+}
+
 #[derive(Clone)]
 pub(crate) struct RequestContext {
     workspace_id: String,
@@ -437,6 +475,7 @@ pub(crate) struct WorkspaceSession {
     pub(crate) stdin: Mutex<ChildStdin>,
     pub(crate) pending: Mutex<HashMap<u64, oneshot::Sender<Value>>>,
     pub(crate) request_context: Mutex<HashMap<u64, RequestContext>>,
+    pub(crate) pending_server_requests: Mutex<HashMap<String, Value>>,
     pub(crate) thread_workspace: Mutex<HashMap<String, String>>,
     pub(crate) hidden_thread_ids: Mutex<HashSet<String>>,
     pub(crate) next_id: AtomicU64,
@@ -479,6 +518,70 @@ impl WorkspaceSession {
 
     pub(crate) async fn workspace_ids_snapshot(&self) -> Vec<String> {
         self.workspace_ids.lock().await.iter().cloned().collect()
+    }
+
+    pub(crate) async fn list_pending_server_requests(
+        &self,
+        workspace_id: &str,
+        thread_id: Option<&str>,
+    ) -> Value {
+        let target_thread_id = thread_id
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        let pending = self.pending_server_requests.lock().await;
+        let mut approvals = Vec::new();
+        let mut user_input_requests = Vec::new();
+        for value in pending.values() {
+            let Some(message) = value.as_object() else {
+                continue;
+            };
+            let Some(method) = message.get("method").and_then(Value::as_str) else {
+                continue;
+            };
+            let Some(workspace) = message
+                .get("workspace_id")
+                .and_then(Value::as_str)
+                .filter(|value| *value == workspace_id)
+            else {
+                continue;
+            };
+            let _ = workspace;
+            let request_id = message
+                .get("id")
+                .cloned()
+                .unwrap_or(Value::Null);
+            let params = message
+                .get("params")
+                .cloned()
+                .unwrap_or(Value::Object(Default::default()));
+            if let Some(ref expected_thread_id) = target_thread_id {
+                let message_thread_id = extract_thread_id(value).unwrap_or_default();
+                if message_thread_id != *expected_thread_id {
+                    continue;
+                }
+            }
+            if method.ends_with("requestApproval") {
+                approvals.push(json!({
+                    "workspace_id": workspace_id,
+                    "request_id": request_id,
+                    "method": method,
+                    "params": params,
+                }));
+                continue;
+            }
+            if method == "item/tool/requestUserInput" {
+                user_input_requests.push(json!({
+                    "workspace_id": workspace_id,
+                    "request_id": request_id,
+                    "params": params,
+                }));
+            }
+        }
+        json!({
+            "approvals": approvals,
+            "userInputRequests": user_input_requests,
+        })
     }
 
     async fn write_message(&self, value: Value) -> Result<(), String> {
@@ -831,6 +934,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
         stdin: Mutex::new(stdin),
         pending: Mutex::new(HashMap::new()),
         request_context: Mutex::new(HashMap::new()),
+        pending_server_requests: Mutex::new(HashMap::new()),
         thread_workspace: Mutex::new(HashMap::new()),
         hidden_thread_ids: Mutex::new(HashSet::new()),
         next_id: AtomicU64::new(1),
@@ -944,6 +1048,33 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
             let routed_workspace_id = mapped_thread_workspace
                 .or_else(|| request_workspace.clone())
                 .unwrap_or_else(|| fallback_workspace_id.clone());
+
+            if let Some(method) = method_name {
+                if is_pending_server_request_method(method) {
+                    if let Some(request_id_key) = normalize_request_id_key(&value) {
+                        let mut message = value.clone();
+                        if let Some(object) = message.as_object_mut() {
+                            object.insert(
+                                "workspace_id".to_string(),
+                                Value::String(routed_workspace_id.clone()),
+                            );
+                        }
+                        session_clone
+                            .pending_server_requests
+                            .lock()
+                            .await
+                            .insert(request_id_key, message);
+                    }
+                } else if method == "serverRequest/resolved" {
+                    if let Some(request_id_key) = request_id_key_from_message(&value) {
+                        session_clone
+                            .pending_server_requests
+                            .lock()
+                            .await
+                            .remove(&request_id_key);
+                    }
+                }
+            }
 
             if let Some(ref tid) = thread_id {
                 if method_name == Some("codex/backgroundThread") {
@@ -1099,6 +1230,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
         // Ensure pending foreground requests cannot accumulate after process output ends.
         session_clone.pending.lock().await.clear();
         session_clone.request_context.lock().await.clear();
+        session_clone.pending_server_requests.lock().await.clear();
     });
 
     let workspace_id = entry.id.clone();

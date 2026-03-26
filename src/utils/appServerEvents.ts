@@ -22,6 +22,7 @@ export const SUPPORTED_APP_SERVER_METHODS = [
   "item/reasoning/textDelta",
   "item/started",
   "item/tool/requestUserInput",
+  "serverRequest/resolved",
   "thread/archived",
   "thread/closed",
   "thread/name/updated",

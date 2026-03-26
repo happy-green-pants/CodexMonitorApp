@@ -7,6 +7,7 @@ const DEFAULT_BROWSER_REMOTE_ORIGIN = "http://127.0.0.1:4733";
 const INVALID_BROWSER_REMOTE_RESPONSE_CODE = "REMOTE_INVALID_RESPONSE";
 const REMOTE_AUTH_REQUIRED_CODE = "REMOTE_AUTH_REQUIRED";
 const REMOTE_UNREACHABLE_BLOCK_MS = 5_000;
+const DEFAULT_BROWSER_REMOTE_TIMEOUT_MS = 12_000;
 
 let nextRpcRequestId = 1;
 let blockedBrowserRemoteSignature: string | null = null;
@@ -253,10 +254,16 @@ export function getBrowserRemoteWebSocketUrl(settings?: Partial<BrowserStoredSet
   return `${wsOrigin}/rpc/ws`;
 }
 
+type BrowserRemoteInvokeOptions = {
+  timeoutMs?: number;
+  signal?: AbortSignal;
+};
+
 export async function browserRemoteInvoke<T>(
   method: string,
   params: Record<string, unknown> = {},
   settings?: Partial<BrowserStoredSettings> | null,
+  options?: BrowserRemoteInvokeOptions,
 ): Promise<T> {
   const resolved = normalizeStoredSettings(settings ?? loadBrowserRemoteSettings());
   const currentSignature = browserRemoteSignature(resolved);
@@ -273,6 +280,48 @@ export async function browserRemoteInvoke<T>(
   ) {
     throw blockedBrowserRemoteError;
   }
+  const abortController = new AbortController();
+  const timeoutMs =
+    typeof options?.timeoutMs === "number" && options.timeoutMs >= 0
+      ? options.timeoutMs
+      : DEFAULT_BROWSER_REMOTE_TIMEOUT_MS;
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  const abortWithReason = (reason: Error) => {
+    if (abortController.signal.aborted) {
+      return;
+    }
+    abortController.abort(reason);
+  };
+  if (options?.signal) {
+    if (options.signal.aborted) {
+      abortWithReason(
+        options.signal.reason instanceof Error
+          ? options.signal.reason
+          : new Error("Remote request was aborted."),
+      );
+    } else {
+      options.signal.addEventListener(
+        "abort",
+        () => {
+          abortWithReason(
+            options.signal?.reason instanceof Error
+              ? options.signal.reason
+              : new Error("Remote request was aborted."),
+          );
+        },
+        { once: true },
+      );
+    }
+  }
+  if (timeoutMs > 0) {
+    timeoutHandle = setTimeout(() => {
+      abortWithReason(
+        new Error(
+          `Remote request timed out after ${timeoutMs}ms. Check Settings → Server and ensure the remote backend is reachable.`,
+        ),
+      );
+    }, timeoutMs);
+  }
   let response: Response;
   try {
     response = await fetch(getBrowserRemoteRpcUrl(resolved), {
@@ -288,17 +337,25 @@ export async function browserRemoteInvoke<T>(
         method,
         params,
       }),
+      signal: abortController.signal,
     });
   } catch (error) {
-    const remoteError = new Error(
-      "Remote server is unreachable. Check Settings → Server and ensure the remote backend is running.",
-    );
+    const remoteError =
+      error instanceof Error && error.message.includes("timed out")
+        ? error
+        : new Error(
+            "Remote server is unreachable. Check Settings → Server and ensure the remote backend is running.",
+          );
     blockBrowserRemoteRequests(
       resolved,
       remoteError,
       Date.now() + REMOTE_UNREACHABLE_BLOCK_MS,
     );
     throw remoteError;
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
   }
 
   let payload: { result?: T; error?: { message?: string } } = {};

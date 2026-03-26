@@ -61,3 +61,27 @@ State Summary (from `changelog_v11.md`):
 - **Change**: 将当前任务切换为 `v1.0.1` 发版；把 `Release` 工作流从仅手动触发改为支持 `v*` tag 自动触发，修复 `latest.json` 和 updater 仍指向上游 `Dimillian/CodexMonitor` 的错误仓库地址，并将 release 上传逻辑改为“Release 已存在则 `upload --clobber`，否则 `create`”；同时为 `release-daemon-binaries.yml` 增加等待主 Release 出现的轮询，避免 daemon 工作流比主 release 更早执行时上传失败；统一桌面、Rust、lockfile 与 Android 版本到 `1.0.1`，并将 Android `versionCode` 提升到 `5` 以满足升级要求。
 - **Why**: 用户要求直接发布 `v1.0.1`，且产物必须同时包含桌面包、安卓 APK 和 daemon 二进制；当前仓库虽然已有 APK 构建，但 `release.yml` 不会随 tag 自动触发，daemon 工作流还依赖“主 Release 已存在”的隐含前提，并且 updater/release URL 仍指向上游仓库，直接打 tag 会导致发布链路不完整或失效。
 - **Goal**: 让推送 `v1.0.1` tag 后，GitHub 能自动生成并汇总桌面安装包、Android release APK 与 daemon 二进制，并保证应用更新元数据指向当前开源仓库。
+---
+### [2026-03-22 13:28] | Agent: Codex (GPT-5)
+- **File**: `/.dev_logs/manifest.md`, `/.dev_logs/changelog_v12.md`, `.github/workflows/release.yml`, `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `android/app/build.gradle`
+- **Change**: 基于用户要求改为重发现有 `v1.0.0` Release，在临时发布分支中将桌面、Rust 与 Android 显示版本回落到 `1.0.0`，并把 Android `versionCode` 提升到 `6` 以保证安装升级序列继续单调递增；同时将主 `release.yml` 收敛为“仅构建并上传 Android APK”的最小工作流，移除会阻断发布的 macOS/Linux/Windows 桌面 bundle 聚合链路，保留独立 `release-daemon-binaries.yml` 继续附加 daemon 二进制到同一 tag release。
+- **Why**: 现有 `v1.0.0` Release 已由用户手工清空产物并保留标题；此前 `v1.0.1` 自动发布实际已验证 APK 构建成功，但主 Release 被 macOS 签名与 Linux bundle 失败阻断。当前目标不是解决所有桌面包问题，而是优先把用户真正需要的 Android APK 与 daemon 二进制稳定上传到现有 `v1.0.0` Release。
+- **Goal**: 通过重置 `v1.0.0` 标签到这次最小发布提交，自动把 `CodexMonitor_1.0.0_android.apk` 与 daemon 二进制重新挂载到 GitHub 上已经存在的 `v1.0.0` Release。
+---
+### [2026-03-22 14:17] | Agent: Codex (GPT-5)
+- **File**: `/.dev_logs/changelog_v12.md`, `docs/build/github-release-runbook.md`, `AGENTS.md`
+- **Change**: 将本轮验证成功的 GitHub 发版路径固化为独立文档 `docs/build/github-release-runbook.md`，明确“打包到 GitHub”默认含义为发布到 `happy-green-pants/CodexMonitorApp` 的 GitHub Release，主工作流负责 Android APK、独立 daemon workflow 负责追加 daemon 二进制，并约束重发旧版本时通过临时发布分支 + 强制更新 tag 的方式复用现有 Release 页面；同时在 `AGENTS.md` 的 runbook 列表、Quick Runbook 和 Canonical References 中加入对该文档的强引用，作为后续 GitHub 发版请求的默认执行入口。
+- **Why**: 用户要求把刚刚跑通的发布流程固定下来，并在后续只说“打包到 GitHub”时默认按这套流程执行；若不把成功路径写入 canonical 文档和 agent 入口，后续容易再次回到桌面 bundle 阻塞主 Release 的旧路径。
+- **Goal**: 让未来所有 GitHub 发版请求都可直接复用同一份可执行 runbook，减少重复判断与发布回归风险。
+--- ### [2026-03-22 22:33] | Agent: Codex (GPT-5)
+- **File**: `/root/.codex/config.toml`, `/www/wwwroot/CodexMonitor/scripts/start_codex_monitor_daemon.sh`
+- **Change**: 将 `mcp_servers.gemini` 与 `mcp_servers.grok-search` 的 `command` 从 `uvx` 改为绝对路径 `/root/.local/bin/uvx`，并在 daemon 启动脚本中显式注入 `/root/.local/bin` 到 `PATH`。
+- **Why**: 远程 daemon 拉起的 Codex 工作区会话已读取到 MCP 配置，但其 `PATH` 不含 `/root/.local/bin`，导致基于 `uvx` 的 stdio MCP server 无法稳定启动，表现为 server 名存在但 `tools/resources` 为空。
+- **Goal**: 让安卓远程 HTTPS 会话能够实际拉起 `gemini` MCP 服务并暴露可用工具，而不只是在状态列表中显示空壳 server。
+---
+--- ### [2026-03-22 22:41] | Agent: Codex (GPT-5)
+- **File**: `/.dev_logs/changelog_v12.md`
+- **Change**: 追加远程 MCP 验证结果：`gemini` 在绝对路径修复后已通过 `list_mcp_server_status` 暴露 `tools.gemini`；`grok-search` 虽然进程可启动、Grok/Tavily API 配置完整且连通，但在同一远程工作区查询中仍返回 `tools: {}`。
+- **Why**: 需要将本轮修复的有效边界记录清楚，避免后续误把 `grok-search` 的独立初始化/握手问题当成 PATH 或 HTTPS 反代问题。
+- **Goal**: 为下一轮针对 `grok-search` MCP 握手/工具发现失败的专项排障保留已验证事实。
+---

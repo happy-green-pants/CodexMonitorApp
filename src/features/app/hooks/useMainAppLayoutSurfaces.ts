@@ -218,6 +218,9 @@ type UseMainAppLayoutSurfacesArgs = {
   setActiveTab: (tab: "home" | "projects" | "codex" | "git" | "log") => void;
   tabletTab: LayoutNodesOptions["primary"]["tabletNavProps"]["activeTab"];
   showMobilePollingFetchStatus: boolean;
+  showMobileReconnectBanner: boolean;
+  mobileReconnectLoading: boolean;
+  onMobileReconnectAndSync: () => void;
   appModalsAboutOpen: boolean;
   updaterState: LayoutNodesOptions["primary"]["updateToastProps"]["state"];
   startUpdate: LayoutNodesOptions["primary"]["updateToastProps"]["onUpdate"];
@@ -379,6 +382,9 @@ export function useMainAppLayoutSurfaces({
   setActiveTab,
   tabletTab,
   showMobilePollingFetchStatus,
+  showMobileReconnectBanner,
+  mobileReconnectLoading,
+  onMobileReconnectAndSync,
   appModalsAboutOpen,
   updaterState,
   startUpdate,
@@ -488,6 +494,9 @@ export function useMainAppLayoutSurfaces({
           ? threadStatusById[activeThreadId]?.lastDurationMs ?? null
           : null,
         showPollingFetchStatus: showMobilePollingFetchStatus,
+        showReconnectBanner: showMobileReconnectBanner,
+        reconnectLoading: mobileReconnectLoading,
+        onReconnectAndSync: onMobileReconnectAndSync,
         pollingIntervalMs,
       },
       composerProps: composerWorkspaceState.showComposer

@@ -739,6 +739,14 @@ impl DaemonState {
         Ok(json!({ "ok": true }))
     }
 
+    async fn list_pending_server_requests(
+        &self,
+        workspace_id: String,
+        thread_id: Option<String>,
+    ) -> Result<Value, String> {
+        codex_core::list_pending_server_requests_core(&self.sessions, workspace_id, thread_id).await
+    }
+
     async fn remember_approval_rule(
         &self,
         workspace_id: String,
@@ -1803,6 +1811,7 @@ mod tests {
             stdin: Mutex::new(stdin),
             pending: Mutex::new(HashMap::new()),
             request_context: Mutex::new(HashMap::new()),
+            pending_server_requests: Mutex::new(HashMap::new()),
             thread_workspace: Mutex::new(HashMap::new()),
             hidden_thread_ids: Mutex::new(HashSet::new()),
             next_id: AtomicU64::new(0),

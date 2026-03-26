@@ -2,12 +2,12 @@
 
 ## Active Changelog
 
-- Current: `/.dev_logs/changelog_v12.md`
+- Current: `/.dev_logs/changelog_v13.md`
 
 ## Current Task
 
-- v1.0.1 发布链路修复与发版
-- Goal: 统一桌面、Rust 与 Android 版本号为 1.0.1，修复 GitHub Release 自动触发、updater 链接和 daemon 上传竞态问题，并通过推送 `v1.0.1` tag 自动产出桌面包、安卓 APK 与 daemon 二进制。
+- Android 远程断连恢复与待响应请求回补
+- Goal: 修复 Android 远程模式下服务端未连接/事件流断开时的卡死与 `requestUserInput` 丢失后永久卡在回复中的问题，补齐自动恢复、手动兜底与 pending server request 回补链路。
 
 ## Notes
 
@@ -18,3 +18,4 @@
 - `changelog_v3.md` exceeded 100 lines; start `changelog_v4.md` for startup request-storm stabilization work.
 - `changelog_v5.md` exceeded 100 lines; start `changelog_v6.md` for image picker runtime compatibility work.
 - `changelog_v11.md` approached the 100-line limit; start `changelog_v12.md` for daemon Linux release workflow fixes.
+- `changelog_v12.md` 已承载上一轮发版与远程 MCP 修复记录；当前 Android 远程恢复任务跨越前端、后端、RPC 与测试多模块，切换到 `changelog_v13.md` 继续记录。

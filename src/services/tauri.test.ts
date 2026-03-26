@@ -29,6 +29,7 @@ import {
   listMcpServerStatus,
   readGlobalAgentsMd,
   readGlobalCodexConfigToml,
+  listPendingServerRequests,
   listWorkspaces,
   openWorkspaceIn,
   readAgentMd,
@@ -1160,6 +1161,22 @@ describe("tauri invoke wrappers", () => {
       result: {
         answers,
       },
+    });
+  });
+
+  it("lists pending server requests for a thread", async () => {
+    const invokeMock = vi.mocked(invoke);
+    const response = {
+      approvals: [],
+      userInputRequests: [],
+    };
+    invokeMock.mockResolvedValueOnce(response);
+
+    await expect(listPendingServerRequests("ws-9", "thread-9")).resolves.toEqual(response);
+
+    expect(invokeMock).toHaveBeenCalledWith("list_pending_server_requests", {
+      workspaceId: "ws-9",
+      threadId: "thread-9",
     });
   });
 

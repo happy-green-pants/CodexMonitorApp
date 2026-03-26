@@ -24,6 +24,7 @@ import { useThreadUserInput } from "./useThreadUserInput";
 import { useThreadTitleAutogeneration } from "./useThreadTitleAutogeneration";
 import {
   archiveThread as archiveThreadService,
+  listPendingServerRequests,
   setThreadName as setThreadNameService,
 } from "@services/tauri";
 import {
@@ -530,6 +531,18 @@ export function useThreads({
       onThreadUnarchived: handleThreadUnarchived,
       onAccountUpdated: handleAccountUpdated,
       onAccountLoginCompleted: handleAccountLoginCompleted,
+      onServerRequestResolved: (workspaceId: string, requestId: string | number) => {
+        dispatch({
+          type: "removeApproval",
+          requestId,
+          workspaceId,
+        });
+        dispatch({
+          type: "removeUserInputRequest",
+          requestId,
+          workspaceId,
+        });
+      },
     }),
     [
       threadHandlers,
@@ -538,6 +551,7 @@ export function useThreads({
       handleThreadUnarchived,
       handleAccountUpdated,
       handleAccountLoginCompleted,
+      dispatch,
     ],
   );
 
@@ -845,6 +859,90 @@ export function useThreads({
     [archiveThread, unpinThread],
   );
 
+  const syncPendingServerRequests = useCallback(
+    async (workspaceId: string, threadId: string) => {
+      if (!workspaceId || !threadId) {
+        return;
+      }
+      const pending = await listPendingServerRequests(workspaceId, threadId);
+      const approvals = Array.isArray(pending.approvals) ? pending.approvals : [];
+      const userInputRequests = Array.isArray(pending.userInputRequests)
+        ? pending.userInputRequests
+        : [];
+
+      const activeApprovalIds = new Set(
+        approvals
+          .map((entry) => {
+            const requestId = entry?.request_id;
+            return typeof requestId === "string" || typeof requestId === "number"
+              ? `${requestId}`
+              : null;
+          })
+          .filter((value): value is string => Boolean(value)),
+      );
+      for (const approval of state.approvals) {
+        if (approval.workspace_id !== workspaceId) {
+          continue;
+        }
+        const approvalThreadId = String(
+          approval.params?.threadId ?? approval.params?.thread_id ?? "",
+        ).trim();
+        if (approvalThreadId !== threadId) {
+          continue;
+        }
+        if (activeApprovalIds.has(String(approval.request_id))) {
+          continue;
+        }
+        dispatch({
+          type: "removeApproval",
+          requestId: approval.request_id,
+          workspaceId,
+        });
+      }
+
+      const activeUserInputIds = new Set(
+        userInputRequests
+          .map((entry) => {
+            const requestId = entry?.request_id;
+            return typeof requestId === "string" || typeof requestId === "number"
+              ? `${requestId}`
+              : null;
+          })
+          .filter((value): value is string => Boolean(value)),
+      );
+      for (const request of state.userInputRequests) {
+        if (request.workspace_id !== workspaceId) {
+          continue;
+        }
+        if (String(request.params.thread_id).trim() !== threadId) {
+          continue;
+        }
+        if (activeUserInputIds.has(String(request.request_id))) {
+          continue;
+        }
+        dispatch({
+          type: "removeUserInputRequest",
+          requestId: request.request_id,
+          workspaceId,
+        });
+      }
+
+      for (const approval of approvals) {
+        if (!approval || typeof approval !== "object") {
+          continue;
+        }
+        dispatch({ type: "addApproval", approval });
+      }
+      for (const request of userInputRequests) {
+        if (!request || typeof request !== "object") {
+          continue;
+        }
+        dispatch({ type: "addUserInputRequest", request });
+      }
+    },
+    [dispatch, state.approvals, state.userInputRequests],
+  );
+
   return {
     activeThreadId,
     setActiveThreadId,
@@ -885,6 +983,7 @@ export function useThreads({
     refreshThread,
     resetWorkspaceThreads,
     loadOlderThreadsForWorkspace,
+    syncPendingServerRequests,
     sendUserMessage,
     sendUserMessageToThread,
     startFork,

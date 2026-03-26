@@ -196,4 +196,41 @@ describe("browserRemote", () => {
     expect(secondError).toBe(firstError);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("times out stalled remote requests", async () => {
+    const fetchMock = vi.fn((_input: string, init?: RequestInit) => {
+      const signal = init?.signal;
+      return new Promise<Response>((_resolve, reject) => {
+        if (!signal) {
+          return;
+        }
+        signal.addEventListener(
+          "abort",
+          () => {
+            reject(
+              signal.reason instanceof Error
+                ? signal.reason
+                : new Error("Remote request timed out."),
+            );
+          },
+          { once: true },
+        );
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    saveBrowserRemoteSettings({
+      backendMode: "remote",
+      remoteBackendProvider: "http",
+      remoteBackendHost: "https://codex.example.com",
+      remoteBackendToken: "token-1",
+    });
+
+    const error = await browserRemoteInvoke("list_workspaces", {}, undefined, {
+      timeoutMs: 10,
+    }).catch((value) => value);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain("timed out");
+  });
 });
