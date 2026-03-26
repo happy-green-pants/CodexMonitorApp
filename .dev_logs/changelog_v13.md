@@ -37,3 +37,9 @@ State Summary (from `changelog_v12.md`):
 - **Why**: 本轮改动扩展了事件支持面和 CodexMonitor 自身的恢复接口，文档需要与实现保持一致。
 - **Goal**: 降低后续协议排查与多端同步时的认知偏差。
 ---
+### [2026-03-26 15:54] | Agent: Codex (GPT-5)
+- **File**: `/package.json`, `/package-lock.json`, `/src-tauri/Cargo.toml`, `/src-tauri/Cargo.lock`, `/src-tauri/tauri.conf.json`, `/android/app/build.gradle`, `/.dev_logs/changelog_v13.md`
+- **Change**: 将前端、Tauri、Rust 与 Android 的版本元数据统一提升到 `1.0.2`，并把 Android `versionCode` 从 `6` 递增到 `7`。
+- **Why**: `v1.0.1` tag 已误指向旧提交，新的 GitHub 修复发版需要使用全新版本号，避免 Release tag、APK 文件名与应用内部版本信息不一致。
+- **Goal**: 为当前合并后的修复代码生成一致的 `v1.0.2` 发布标识，确保 GitHub Release 与客户端版本元数据对齐。
+---
