@@ -543,6 +543,7 @@ export default function MainApp() {
     loadOlderThreadsForWorkspace,
     resetWorkspaceThreads,
     refreshThread,
+    syncPendingServerRequests,
     sendUserMessage,
     sendUserMessageToThread,
     startFork,
@@ -600,18 +601,22 @@ export default function MainApp() {
     threadSortKey: threadListSortKey,
     onThreadCodexMetadataDetected: handleThreadCodexMetadataDetected,
   });
-  const { connectionState: remoteThreadConnectionState, reconnectLive } =
-    useRemoteThreadLiveConnection({
-      backendMode: appSettings.backendMode,
-      activeWorkspace,
-      activeThreadId,
-      activeThreadHasLocalSnapshot: hasLocalThreadSnapshot(activeThreadId),
-      activeThreadIsProcessing: Boolean(
-        activeThreadId && threadStatusById[activeThreadId]?.isProcessing,
-      ),
-      refreshThread,
-      reconnectWorkspace: connectWorkspace,
-    });
+  const {
+    connectionState: remoteThreadConnectionState,
+    reconnectLive,
+    recoverThreadState,
+  } = useRemoteThreadLiveConnection({
+    backendMode: appSettings.backendMode,
+    activeWorkspace,
+    activeThreadId,
+    activeThreadHasLocalSnapshot: hasLocalThreadSnapshot(activeThreadId),
+    activeThreadIsProcessing: Boolean(
+      activeThreadId && threadStatusById[activeThreadId]?.isProcessing,
+    ),
+    refreshThread,
+    reconnectWorkspace: connectWorkspace,
+    syncPendingServerRequests,
+  });
 
   const handleMobileThreadRefresh = useCallback(() => {
     if (mobileThreadRefreshLoading || !activeWorkspace) {
@@ -628,7 +633,12 @@ export default function MainApp() {
       if (!threadId) {
         return;
       }
+      if (threadId === activeThreadId) {
+        await recoverThreadState();
+        return;
+      }
       await refreshThread(activeWorkspace.id, threadId);
+      await syncPendingServerRequests(activeWorkspace.id, threadId);
       await reconnectLive(activeWorkspace.id, threadId, { runResume: false });
     })()
       .catch(() => {
@@ -641,8 +651,10 @@ export default function MainApp() {
     activeThreadId,
     activeWorkspace,
     mobileThreadRefreshLoading,
+    recoverThreadState,
     refreshThread,
     reconnectLive,
+    syncPendingServerRequests,
     startThreadForWorkspace,
   ]);
   const gitState = useMainAppGitState({
@@ -1644,6 +1656,11 @@ export default function MainApp() {
     Boolean(activeWorkspace?.connected) &&
     appSettings.backendMode === "remote" &&
     remoteThreadConnectionState === "polling";
+  const showMobileReconnectBanner =
+    showCompactCodexThreadActions &&
+    appSettings.backendMode === "remote" &&
+    Boolean(activeThreadId) &&
+    remoteThreadConnectionState !== "live";
   const gitRootOverride = activeWorkspace?.settings.gitRoot;
   const hasGitRootOverride =
     typeof gitRootOverride === "string" && gitRootOverride.trim().length > 0;
@@ -1925,6 +1942,9 @@ export default function MainApp() {
     setActiveTab,
     tabletTab,
     showMobilePollingFetchStatus,
+    showMobileReconnectBanner,
+    mobileReconnectLoading: mobileThreadRefreshLoading,
+    onMobileReconnectAndSync: handleMobileThreadRefresh,
     appModalsAboutOpen:
       appModalsProps.settingsOpen && appModalsProps.settingsSection === 'about',
     updaterState,

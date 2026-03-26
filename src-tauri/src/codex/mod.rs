@@ -839,6 +839,26 @@ pub(crate) async fn respond_to_server_request(
 }
 
 #[tauri::command]
+pub(crate) async fn list_pending_server_requests(
+    workspace_id: String,
+    thread_id: Option<String>,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Value, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        return remote_backend::call_remote(
+            &*state,
+            app,
+            "list_pending_server_requests",
+            json!({ "workspaceId": workspace_id, "threadId": thread_id }),
+        )
+        .await;
+    }
+
+    codex_core::list_pending_server_requests_core(&state.sessions, workspace_id, thread_id).await
+}
+
+#[tauri::command]
 pub(crate) async fn remember_approval_rule(
     workspace_id: String,
     command: Vec<String>,

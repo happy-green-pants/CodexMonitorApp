@@ -23,6 +23,10 @@ const subscribeAppServerEventsMock = vi.fn((
 
 const threadLiveSubscribeMock = vi.fn().mockResolvedValue(undefined);
 const threadLiveUnsubscribeMock = vi.fn().mockResolvedValue(undefined);
+const listPendingServerRequestsMock = vi.fn().mockResolvedValue({
+  approvals: [],
+  userInputRequests: [],
+});
 const pushErrorToastMock = vi.fn();
 
 vi.mock("@services/events", () => ({
@@ -35,6 +39,7 @@ vi.mock("@services/events", () => ({
 vi.mock("@services/tauri", () => ({
   threadLiveSubscribe: (...args: any[]) => threadLiveSubscribeMock(...args),
   threadLiveUnsubscribe: (...args: any[]) => threadLiveUnsubscribeMock(...args),
+  listPendingServerRequests: (...args: any[]) => listPendingServerRequestsMock(...args),
 }));
 
 vi.mock("@services/toasts", () => ({
@@ -79,6 +84,7 @@ describe("useRemoteThreadLiveConnection", () => {
     subscribeAppServerEventsMock.mockClear();
     threadLiveSubscribeMock.mockClear();
     threadLiveUnsubscribeMock.mockClear();
+    listPendingServerRequestsMock.mockClear();
     pushErrorToastMock.mockClear();
     isMobilePlatformMock.mockReset();
     isMobilePlatformMock.mockReturnValue(false);
@@ -777,5 +783,70 @@ describe("useRemoteThreadLiveConnection", () => {
     expect(threadLiveUnsubscribeMock).toHaveBeenCalledTimes(1);
     expect(threadLiveSubscribeMock).toHaveBeenCalledTimes(2);
     expect(refreshThread).toHaveBeenCalledTimes(0);
+  });
+
+  it("syncs pending server requests after reconnect resume", async () => {
+    const refreshThread = vi.fn().mockResolvedValue(undefined);
+    const syncPendingServerRequests = vi.fn().mockResolvedValue(undefined);
+
+    renderHook(() =>
+      useRemoteThreadLiveConnection({
+        backendMode: "remote",
+        activeWorkspace: {
+          id: "ws-1",
+          name: "Workspace",
+          path: "/tmp/ws-1",
+          connected: true,
+          settings: { sidebarCollapsed: false },
+        },
+        activeThreadId: "thread-1",
+        refreshThread,
+        syncPendingServerRequests,
+      } as any),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      for (const listener of appServerListeners) {
+        listener({
+          workspace_id: "ws-1",
+          method: "thread/live_detached",
+          params: { threadId: "thread-1" },
+        });
+      }
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(syncPendingServerRequests).toHaveBeenCalledWith("ws-1", "thread-1");
+  });
+
+  it("exposes a recovery helper for the active thread", async () => {
+    const refreshThread = vi.fn().mockResolvedValue(undefined);
+
+    const { result } = renderHook(() =>
+      useRemoteThreadLiveConnection({
+        backendMode: "remote",
+        activeWorkspace: {
+          id: "ws-1",
+          name: "Workspace",
+          path: "/tmp/ws-1",
+          connected: true,
+          settings: { sidebarCollapsed: false },
+        },
+        activeThreadId: "thread-1",
+        refreshThread,
+      }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(typeof (result.current as any).recoverThreadState).toBe("function");
   });
 });

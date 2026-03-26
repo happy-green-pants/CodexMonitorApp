@@ -9,6 +9,7 @@ Detailed navigation/runbooks live in:
 
 - `docs/codebase-map.md` (task-oriented file map: "if you need X, edit Y")
 - `docs/multi-agent-sync-runbook.md` (upstream `../Codex` sync checklist for multi-agent/config behavior)
+- `docs/build/github-release-runbook.md` (default GitHub release flow for Android APK + daemon binaries; use this when the user asks to package/publish to GitHub)
 - `README.md` (setup, build, release, and broader project docs)
 
 ## Project Snapshot
@@ -145,6 +146,12 @@ Release build:
 npm run tauri:build
 ```
 
+GitHub release packaging default:
+
+- When the user says "打包到 GitHub" or asks to publish to GitHub Release, follow `docs/build/github-release-runbook.md`.
+- Default deliverables are the Android APK plus daemon binaries uploaded to the existing/new GitHub Release.
+- Do not assume desktop app bundles are required unless the user explicitly asks for them.
+
 Backend daemon release build (main workspace only):
 
 ```bash
@@ -182,4 +189,5 @@ Use extra care in high-churn/high-complexity files:
 
 - Task-oriented code map: `docs/codebase-map.md`
 - Multi-agent upstream sync runbook: `docs/multi-agent-sync-runbook.md`
+- GitHub release default flow: `docs/build/github-release-runbook.md`
 - Setup/build/release/test commands: `README.md`

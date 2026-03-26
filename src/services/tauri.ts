@@ -9,11 +9,13 @@ import {
 } from "./browserRemote";
 import type {
   AppSettings,
+  ApprovalRequest,
   CodexUpdateResult,
   CodexDoctorResult,
   DictationModelStatus,
   DictationSessionState,
   LocalUsageSnapshot,
+  RequestUserInputRequest,
   TcpDaemonStatus,
   TailscaleDaemonCommandPreview,
   TailscaleStatus,
@@ -695,6 +697,21 @@ export async function respondToUserInputRequest(
     workspaceId,
     requestId,
     result: { answers },
+  });
+}
+
+export type PendingServerRequestsResponse = {
+  approvals: ApprovalRequest[];
+  userInputRequests: RequestUserInputRequest[];
+};
+
+export async function listPendingServerRequests(
+  workspaceId: string,
+  threadId?: string | null,
+) {
+  return invoke<PendingServerRequestsResponse>("list_pending_server_requests", {
+    workspaceId,
+    threadId: threadId ?? null,
   });
 }
 

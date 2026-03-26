@@ -451,6 +451,18 @@ pub(super) async fn try_handle(
                     .await,
             )
         }
+        "list_pending_server_requests" => {
+            let workspace_id = match parse_string(params, "workspaceId") {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            let thread_id = parse_optional_string(params, "threadId");
+            Some(
+                state
+                    .list_pending_server_requests(workspace_id, thread_id)
+                    .await,
+            )
+        }
         "remember_approval_rule" => {
             let workspace_id = match parse_string(params, "workspaceId") {
                 Ok(value) => value,

@@ -32,6 +32,10 @@ type UseRemoteThreadLiveConnectionOptions = {
   activeThreadIsProcessing?: boolean;
   refreshThread: (workspaceId: string, threadId: string) => Promise<unknown> | unknown;
   reconnectWorkspace?: (workspace: WorkspaceInfo) => Promise<unknown> | unknown;
+  syncPendingServerRequests?: (
+    workspaceId: string,
+    threadId: string,
+  ) => Promise<unknown> | unknown;
 };
 
 function keyForThread(workspaceId: string, threadId: string) {
@@ -89,6 +93,7 @@ export function useRemoteThreadLiveConnection({
   activeThreadIsProcessing = false,
   refreshThread,
   reconnectWorkspace,
+  syncPendingServerRequests,
 }: UseRemoteThreadLiveConnectionOptions) {
   const activeWorkspaceId = activeWorkspace?.id ?? null;
   const activeWorkspaceConnected = activeWorkspace?.connected ?? false;
@@ -110,6 +115,7 @@ export function useRemoteThreadLiveConnection({
   const activeThreadIsProcessingRef = useRef(activeThreadIsProcessing);
   const refreshThreadRef = useRef(refreshThread);
   const reconnectWorkspaceRef = useRef(reconnectWorkspace);
+  const syncPendingServerRequestsRef = useRef(syncPendingServerRequests);
   const connectionStateRef = useRef(connectionState);
   const activeSubscriptionKeyRef = useRef<string | null>(null);
   const desiredSubscriptionKeyRef = useRef<string | null>(null);
@@ -134,6 +140,7 @@ export function useRemoteThreadLiveConnection({
     activeThreadIsProcessingRef.current = activeThreadIsProcessing;
     refreshThreadRef.current = refreshThread;
     reconnectWorkspaceRef.current = reconnectWorkspace;
+    syncPendingServerRequestsRef.current = syncPendingServerRequests;
   }, [
     backendMode,
     activeWorkspace,
@@ -142,6 +149,7 @@ export function useRemoteThreadLiveConnection({
     activeThreadIsProcessing,
     refreshThread,
     reconnectWorkspace,
+    syncPendingServerRequests,
   ]);
 
   useEffect(() => {
@@ -287,6 +295,9 @@ export function useRemoteThreadLiveConnection({
 
           if (shouldResume) {
             await Promise.resolve(refreshThreadRef.current(workspaceId, threadId));
+            await Promise.resolve(
+              syncPendingServerRequestsRef.current?.(workspaceId, threadId),
+            );
           }
           if (sequence !== reconnectSequenceRef.current) {
             return false;
@@ -681,8 +692,33 @@ export function useRemoteThreadLiveConnection({
     };
   }, [reconnectLive, reconcileDisconnectedState, unsubscribeByKey]);
 
+  const recoverThreadState = useCallback(async (): Promise<boolean> => {
+    const workspace = activeWorkspaceRef.current;
+    const threadId = activeThreadIdRef.current;
+    if (
+      backendModeRef.current !== "remote" ||
+      !workspace ||
+      !threadId
+    ) {
+      reconcileDisconnectedState();
+      return false;
+    }
+    if (!workspace.connected && reconnectWorkspaceRef.current) {
+      await Promise.resolve(reconnectWorkspaceRef.current(workspace));
+    }
+    await Promise.resolve(refreshThreadRef.current(workspace.id, threadId));
+    await Promise.resolve(
+      syncPendingServerRequestsRef.current?.(workspace.id, threadId),
+    );
+    return reconnectLive(workspace.id, threadId, {
+      runResume: false,
+      reason: "focus",
+    });
+  }, [reconcileDisconnectedState, reconnectLive]);
+
   return {
     connectionState,
     reconnectLive,
+    recoverThreadState,
   };
 }

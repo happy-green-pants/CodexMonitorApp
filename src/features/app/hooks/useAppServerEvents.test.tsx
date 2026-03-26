@@ -539,4 +539,27 @@ describe("useAppServerEvents", () => {
       root.unmount();
     });
   });
+
+  it("routes server request resolved notifications", async () => {
+    const handlers: Handlers = {
+      onServerRequestResolved: vi.fn(),
+    };
+    const { root } = await mount(handlers);
+
+    act(() => {
+      listener?.({
+        workspace_id: "ws-2",
+        message: {
+          method: "serverRequest/resolved",
+          params: { requestId: 91 },
+        },
+      });
+    });
+
+    expect(handlers.onServerRequestResolved).toHaveBeenCalledWith("ws-2", 91);
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
 });

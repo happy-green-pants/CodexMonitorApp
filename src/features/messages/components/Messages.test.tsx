@@ -13,8 +13,9 @@ const useFileLinkOpenerMock = vi.fn(
 );
 const openFileLinkMock = vi.fn();
 const showFileLinkMenuMock = vi.fn();
-const { exportMarkdownFileMock } = vi.hoisted(() => ({
+const { exportMarkdownFileMock, isMobilePlatformMock } = vi.hoisted(() => ({
   exportMarkdownFileMock: vi.fn(),
+  isMobilePlatformMock: vi.fn(() => false),
 }));
 
 vi.mock("../hooks/useFileLinkOpener", () => ({
@@ -35,6 +36,10 @@ vi.mock("@services/tauri", async () => {
   };
 });
 
+vi.mock("@utils/platformPaths", () => ({
+  isMobilePlatform: () => isMobilePlatformMock(),
+}));
+
 describe("Messages", () => {
   beforeAll(() => {
     if (!HTMLElement.prototype.scrollIntoView) {
@@ -51,6 +56,8 @@ describe("Messages", () => {
     openFileLinkMock.mockReset();
     showFileLinkMenuMock.mockReset();
     exportMarkdownFileMock.mockReset();
+    isMobilePlatformMock.mockReset();
+    isMobilePlatformMock.mockReturnValue(false);
   });
 
   it("renders image grid above message text and opens lightbox", () => {
@@ -1624,5 +1631,28 @@ describe("Messages", () => {
       screen.getByText("command • sync • thread • session-start.sh • Preparing"),
     ).toBeTruthy();
     expect(screen.getByText("[error] Missing config")).toBeTruthy();
+  });
+
+  it("shows a mobile reconnect banner while polling and triggers manual recovery", async () => {
+    isMobilePlatformMock.mockReturnValue(true);
+    const onReconnectAndSync = vi.fn();
+
+    render(
+      <Messages
+        items={[]}
+        threadId="thread-1"
+        workspaceId="ws-1"
+        isThinking={false}
+        showPollingFetchStatus
+        openTargets={[]}
+        selectedOpenAppId=""
+        onReconnectAndSync={onReconnectAndSync}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /reconnect and sync/i }));
+    await waitFor(() => {
+      expect(onReconnectAndSync).toHaveBeenCalledTimes(1);
+    });
   });
 });
