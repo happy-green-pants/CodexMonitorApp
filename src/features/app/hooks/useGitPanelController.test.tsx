@@ -36,6 +36,7 @@ const workspace: WorkspaceInfo = {
 function makeProps(overrides?: Partial<Parameters<typeof useGitPanelController>[0]>) {
   return {
     activeWorkspace: workspace,
+    backendMode: "local" as const,
     activeItems: [],
     gitDiffPreloadEnabled: false,
     gitDiffIgnoreWhitespaceChanges: false,
@@ -69,6 +70,11 @@ beforeEach(() => {
       unstagedFiles: [],
       totalAdditions: 0,
       totalDeletions: 0,
+      loadHint: {
+        changedFileCount: 0,
+        modeChangeDominant: false,
+        shouldDeferDiffs: false,
+      },
     },
     refresh: vi.fn(),
   });
@@ -156,6 +162,56 @@ describe("useGitPanelController preload behavior", () => {
 
     const enabled = getLastEnabledArg();
     expect(enabled).toBe(true);
+  });
+
+  it("skips automatic local diff loading for heavy remote repositories until a file is selected", () => {
+    useGitStatusMock.mockReturnValue({
+      status: {
+        branchName: "main",
+        files: [
+          {
+            path: "src/main.ts",
+            status: "M",
+            additions: 0,
+            deletions: 0,
+          },
+        ],
+        stagedFiles: [],
+        unstagedFiles: [
+          {
+            path: "src/main.ts",
+            status: "M",
+            additions: 0,
+            deletions: 0,
+          },
+        ],
+        totalAdditions: 0,
+        totalDeletions: 0,
+        loadHint: {
+          changedFileCount: 6620,
+          modeChangeDominant: true,
+          shouldDeferDiffs: true,
+        },
+      },
+      refresh: vi.fn(),
+    });
+
+    const { result } = renderHook(() =>
+      useGitPanelController(
+        makeProps({
+          backendMode: "remote",
+          gitDiffPreloadEnabled: true,
+        }),
+      ),
+    );
+
+    expect(getLastEnabledArg()).toBe(false);
+
+    act(() => {
+      result.current.handleSelectDiff("src/main.ts");
+    });
+
+    expect(getLastEnabledArg()).toBe(true);
   });
 
   it("derives per-file diffs from active thread fileChange items", () => {

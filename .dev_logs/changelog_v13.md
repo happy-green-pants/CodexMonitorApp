@@ -1,3 +1,11 @@
+---
+### [2026-03-27 11:24] | Agent: Claude Code (Sonnet 4.6)
+- **File**: `/CLAUDE.md`
+- **Change**: 新增“后端服务打包流程（主工作区）”说明，固化 `codex_monitor_daemon` release 构建命令、产物路径、`--help` 验证与脚本启动方式。
+- **Why**: 用户要求将打包流程写入 CLAUDE.md，确保后续指令直接按主工作区流程执行。
+- **Goal**: 让“打包后端服务”在主工作区可重复、可验证地完成。
+---
+
 State Summary (from `changelog_v12.md`):
 - GitHub Release 的 Android APK + daemon 发布流程已固化为默认 runbook。
 - 远程 MCP 的 PATH/绝对路径问题已修复，`gemini` 可在远程工作区正常暴露工具。
@@ -42,4 +50,22 @@ State Summary (from `changelog_v12.md`):
 - **Change**: 将前端、Tauri、Rust 与 Android 的版本元数据统一提升到 `1.0.2`，并把 Android `versionCode` 从 `6` 递增到 `7`。
 - **Why**: `v1.0.1` tag 已误指向旧提交，新的 GitHub 修复发版需要使用全新版本号，避免 Release tag、APK 文件名与应用内部版本信息不一致。
 - **Goal**: 为当前合并后的修复代码生成一致的 `v1.0.2` 发布标识，确保 GitHub Release 与客户端版本元数据对齐。
+---
+### [2026-03-27 09:10] | Agent: Codex (GPT-5)
+- **File**: `/src/features/app/hooks/useLiquidGlassEffect.ts`, `/src/features/app/hooks/useLiquidGlassEffect.test.tsx`, `/src/services/tauri.ts`, `/src/services/tauri.test.ts`
+- **Change**: 为液态玻璃 hook 增加 `isTauri()` 运行时守卫，并对缺失 `metadata` 的 Tauri 窗口初始化错误做静默降级；为 `setMenuAccelerators` 增加非 Tauri no-op；补充对应回归测试覆盖浏览器/远程模式下的跳过行为与桌面模式下的保留行为。
+- **Why**: 远程/移动模式不应访问桌面窗口 API，也不应为菜单快捷键发起远程 RPC，否则会产生 `liquid-glass/apply-error` 与 `menu/accelerator-error` 噪音。
+- **Goal**: 让非关键桌面增强在远程/移动 runtime 静默降级，同时保留桌面 Tauri 下原有能力。
+---
+### [2026-03-27 10:55] | Agent: Codex (GPT-5)
+- **File**: `/www/wwwroot/baoyao3/app/cron/controller/Task.php`
+- **Change**: 将 `baoyao3` 站点计划任务控制器从“执行后 `sleep(60)` 并再次 HTTP 回调自身”的长阻塞链路改为抽出的 `runCron()` 单次执行；`execute()` 快速返回 JSON，`phpCron()` 在 `fastcgi_finish_request()` 后后台继续执行任务，避免首个触发请求同步等待完整 cron 处理。
+- **Why**: 现场证据显示 `baoyao3` 的高延迟来自 `/cron/task/execute.html` 长时间阻塞与自循环调用，PHP-FPM slowlog 明确落在 `Task.php:47` 的 `sleep()`，访问日志持续出现该路由的 `499`。
+- **Goal**: 消除可复现的单站点长请求卡顿，让 cron HTTP 入口快速返回，避免持续占用 PHP-FPM worker 并放大访问卡顿。
+---
+### [2026-03-27 12:58] | Agent: Codex (GPT-5)
+- **File**: `/src/features/git/hooks/useGitStatus.test.tsx`, `/src/features/app/hooks/useGitPanelController.test.tsx`, `/src/features/git/components/GitDiffPanel.test.tsx`, `/src-tauri/src/shared/git_ui_core/tests.rs`, `/.dev_logs/manifest.md`
+- **Change**: 新增 heavy Git 工作区回归测试骨架，覆盖远程模式下停止 Git 状态轮询、heavy 仓库默认停用自动 diff 加载、Git 面板降级提示，以及 Rust 侧 large mode-change 仓库的 `loadHint` 判定。
+- **Why**: 本轮修复要求先用失败测试锁定“远程移动端被 heavy Git 自动链路拖慢”的具体行为，再反推最小实现，避免只做表层限流。
+- **Goal**: 为 heavy Git workspace 降级实现提供明确红灯测试，并把当前任务切换到远程移动端连接稳定性修复。
 ---

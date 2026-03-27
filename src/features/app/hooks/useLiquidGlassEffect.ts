@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { isTauri } from "@tauri-apps/api/core";
 import {
   isGlassSupported,
   setLiquidGlassEffect,
@@ -12,6 +13,14 @@ type Params = {
   onDebug?: (entry: DebugEntry) => void;
 };
 
+function isMissingTauriWindowMetadataError(error: unknown) {
+  return (
+    error instanceof TypeError &&
+    (error.message.includes("reading 'metadata'") ||
+      error.message.includes("reading \"metadata\""))
+  );
+}
+
 export function useLiquidGlassEffect({ reduceTransparency, onDebug }: Params) {
   const supportedRef = useRef<boolean | null>(null);
 
@@ -19,6 +28,10 @@ export function useLiquidGlassEffect({ reduceTransparency, onDebug }: Params) {
     let cancelled = false;
 
     const apply = async () => {
+      if (!isTauri()) {
+        return;
+      }
+
       try {
         const window = getCurrentWindow();
         if (reduceTransparency) {
@@ -70,7 +83,7 @@ export function useLiquidGlassEffect({ reduceTransparency, onDebug }: Params) {
           radius: 16,
         });
       } catch (error) {
-        if (cancelled || !onDebug) {
+        if (cancelled || isMissingTauriWindowMetadataError(error) || !onDebug) {
           return;
         }
         onDebug({

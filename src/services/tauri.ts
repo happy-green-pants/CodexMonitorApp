@@ -1068,6 +1068,9 @@ type MenuAcceleratorUpdate = {
 export async function setMenuAccelerators(
   updates: MenuAcceleratorUpdate[],
 ): Promise<void> {
+  if (!isTauri()) {
+    return;
+  }
   return invoke("menu_set_accelerators", { updates });
 }
 

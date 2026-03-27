@@ -41,6 +41,7 @@ import {
   sendNotification,
   setCodexFeatureFlag,
   setAgentsCoreSettings,
+  setMenuAccelerators,
   setTrayRecentThreads,
   setTraySessionUsage,
   startReview,
@@ -379,6 +380,42 @@ describe("tauri invoke wrappers", () => {
 
     await expect(listWorkspaces()).resolves.toEqual([{ id: "ws-browser" }]);
     expect(browserRemoteInvoke).toHaveBeenCalledWith("list_workspaces", {});
+  });
+
+  it("skips menu accelerator updates outside Tauri", async () => {
+    vi.mocked(isTauri).mockReturnValue(false);
+
+    await expect(
+      setMenuAccelerators([
+        {
+          id: "view_toggle_terminal",
+          accelerator: "CmdOrCtrl+Shift+T",
+        },
+      ]),
+    ).resolves.toBeUndefined();
+
+    expect(invoke).not.toHaveBeenCalledWith(
+      "menu_set_accelerators",
+      expect.anything(),
+    );
+    expect(browserRemoteInvoke).not.toHaveBeenCalled();
+  });
+
+  it("invokes menu accelerator updates in Tauri", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce(undefined);
+    const updates = [
+      {
+        id: "view_toggle_terminal",
+        accelerator: "CmdOrCtrl+Shift+T",
+      },
+    ];
+
+    await setMenuAccelerators(updates);
+
+    expect(invokeMock).toHaveBeenCalledWith("menu_set_accelerators", {
+      updates,
+    });
   });
 
   it("persists browser app settings outside Tauri", async () => {

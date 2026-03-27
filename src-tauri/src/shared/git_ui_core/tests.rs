@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 use git2::Repository;
 use serde_json::Value;
@@ -434,4 +436,74 @@ fn collect_ignored_paths_with_git_handles_large_ignored_output() {
         diff::collect_ignored_paths_with_git(&repo, &paths).expect("collect ignored paths");
 
     assert_eq!(ignored_paths.len(), total);
+}
+
+#[cfg(unix)]
+#[test]
+fn get_git_status_marks_large_mode_only_repo_as_heavy() {
+    let (root, repo) = create_temp_repo();
+    let sig = git2::Signature::now("Test", "test@example.com").expect("signature");
+
+    let total = 520usize;
+    for index in 0..total {
+        let path = root.join(format!("file-{index}.txt"));
+        fs::write(&path, "tracked\n").expect("write tracked file");
+    }
+
+    let mut index = repo.index().expect("repo index");
+    for entry_index in 0..total {
+        index
+            .add_path(Path::new(&format!("file-{entry_index}.txt")))
+            .expect("add tracked path");
+    }
+    index.write().expect("write index");
+    let tree_id = index.write_tree().expect("write tree");
+    let tree = repo.find_tree(tree_id).expect("find tree");
+    repo.commit(Some("HEAD"), &sig, &sig, "init", &tree, &[])
+        .expect("commit");
+
+    for entry_index in 0..total {
+        let path = root.join(format!("file-{entry_index}.txt"));
+        let mut permissions = fs::metadata(&path).expect("metadata").permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&path, permissions).expect("chmod tracked file");
+    }
+
+    let workspace = WorkspaceEntry {
+        id: "w-heavy".to_string(),
+        name: "w-heavy".to_string(),
+        path: root.to_string_lossy().to_string(),
+        kind: WorkspaceKind::Main,
+        parent_id: None,
+        worktree: None,
+        settings: WorkspaceSettings::default(),
+    };
+    let mut entries = HashMap::new();
+    entries.insert("w-heavy".to_string(), workspace);
+    let workspaces = Mutex::new(entries);
+
+    let runtime = Runtime::new().expect("create tokio runtime");
+    let status = runtime
+        .block_on(diff::get_git_status_inner(&workspaces, "w-heavy".to_string()))
+        .expect("get git status");
+
+    let load_hint = status.get("loadHint").expect("load hint");
+    assert_eq!(
+        load_hint
+            .get("shouldDeferDiffs")
+            .and_then(Value::as_bool),
+        Some(true)
+    );
+    assert_eq!(
+        load_hint
+            .get("modeChangeDominant")
+            .and_then(Value::as_bool),
+        Some(true)
+    );
+    assert_eq!(
+        load_hint
+            .get("changedFileCount")
+            .and_then(Value::as_u64),
+        Some(total as u64)
+    );
 }

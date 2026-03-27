@@ -6,8 +6,8 @@
 
 ## Current Task
 
-- Android 远程断连恢复与待响应请求回补
-- Goal: 修复 Android 远程模式下服务端未连接/事件流断开时的卡死与 `requestUserInput` 丢失后永久卡在回复中的问题，补齐自动恢复、手动兜底与 pending server request 回补链路。
+- 远程移动端 heavy Git 工作区连接降级与稳定性修复
+- Goal: 识别大规模脏仓库与 mode-change 主导仓库，在远程/移动端停止高成本自动 Git diff 链路并保留手动查看能力，避免添加工作区后卡顿或连接失败。
 
 ## Notes
 
