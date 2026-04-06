@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { subscribeAppServerEvents } from "@services/events";
 import { threadLiveSubscribe, threadLiveUnsubscribe } from "@services/tauri";
-import { pushErrorToast } from "@services/toasts";
 import {
   getAppServerParams,
   getAppServerRawMethod,
@@ -16,7 +15,6 @@ const SELF_DETACH_IGNORE_WINDOW_MS = 10_000;
 const LIVE_STALL_TIMEOUT_MS = 15_000;
 const LIVE_STALL_COOLDOWN_MS = 30_000;
 const LIVE_STALL_REFRESH_COOLDOWN_MS = 12_000;
-const EVENT_STREAM_TOAST_COOLDOWN_MS = 30_000;
 const CAPACITOR_RESUME_COOLDOWN_MS = 2000;
 
 type ReconnectOptions = {
@@ -129,7 +127,6 @@ export function useRemoteThreadLiveConnection({
   const lastRelevantEventAtMsRef = useRef<number>(Date.now());
   const lastLiveStallHandledAtMsRef = useRef<number>(0);
   const lastLiveStallRefreshAtMsRef = useRef<number>(0);
-  const lastEventStreamToastAtMsRef = useRef<number>(0);
   const lastCapacitorResumeAtMsRef = useRef<number>(0);
 
   useEffect(() => {
@@ -164,39 +161,12 @@ export function useRemoteThreadLiveConnection({
     setConnectionState(next);
   }, []);
 
-  const maybeToastEventStreamIssue = useCallback((title: string, message: string) => {
-    if (isMobilePlatform()) {
-      return;
-    }
-    const now = Date.now();
-    if (now - lastEventStreamToastAtMsRef.current < EVENT_STREAM_TOAST_COOLDOWN_MS) {
-      return;
-    }
-    lastEventStreamToastAtMsRef.current = now;
-    pushErrorToast({
-      title,
-      message,
-      durationMs: 6000,
-    });
-  }, []);
-
   const degradeToPollingBestEffort = useCallback(
-    async (workspaceId: string, threadId: string, reason: "ws-error" | "stall") => {
+    async (workspaceId: string, threadId: string) => {
       if (!workspaceId || !threadId) {
         return;
       }
       setState("polling");
-      if (reason === "ws-error") {
-        maybeToastEventStreamIssue(
-          "实时事件流已断开",
-          "已自动切换为轮询同步（Polling）。网络恢复后会自动重连。",
-        );
-      } else {
-        maybeToastEventStreamIssue(
-          "实时事件流无响应",
-          "已自动切换为轮询同步（Polling）。",
-        );
-      }
       if (!isDocumentVisible()) {
         return;
       }
@@ -211,7 +181,7 @@ export function useRemoteThreadLiveConnection({
         // Refresh failures are surfaced elsewhere; avoid toast spam here.
       }
     },
-    [maybeToastEventStreamIssue, setState],
+    [setState],
   );
 
   const unsubscribeByKey = useCallback(
@@ -486,7 +456,7 @@ export function useRemoteThreadLiveConnection({
             return;
           }
           console.warn("[remote-live] app-server event stream error", error);
-          void degradeToPollingBestEffort(workspaceId, threadId, "ws-error");
+          void degradeToPollingBestEffort(workspaceId, threadId);
         },
       },
     );
@@ -582,7 +552,7 @@ export function useRemoteThreadLiveConnection({
         return;
       }
       lastLiveStallHandledAtMsRef.current = now;
-      void degradeToPollingBestEffort(workspaceId, threadId, "stall");
+      void degradeToPollingBestEffort(workspaceId, threadId);
     }, 1000);
 
     return () => {

@@ -1,4 +1,9 @@
-import type { AppServerEvent } from "../types";
+import type {
+  AppServerEvent,
+  RequestUserInputOption,
+  RequestUserInputQuestion,
+  RequestUserInputRequest,
+} from "../types";
 
 export const SUPPORTED_APP_SERVER_METHODS = [
   "app/list/updated",
@@ -44,6 +49,67 @@ export const METHODS_HANDLED_OUTSIDE_USE_APP_SERVER_EVENTS = [
 ] as const satisfies readonly SupportedAppServerMethod[];
 
 const SUPPORTED_METHOD_SET = new Set<string>(SUPPORTED_APP_SERVER_METHODS);
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function asTrimmedString(value: unknown): string {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  if (value === null || value === undefined) {
+    return "";
+  }
+  return String(value).trim();
+}
+
+function normalizeRequestUserInputOptions(
+  value: unknown,
+): RequestUserInputOption[] | undefined {
+  const optionsRaw = Array.isArray(value) ? value : [];
+  const options = optionsRaw
+    .map((entry) => {
+      const record = asRecord(entry);
+      if (!record) {
+        return null;
+      }
+      const label = asTrimmedString(record.label);
+      const description = asTrimmedString(record.description);
+      if (!label && !description) {
+        return null;
+      }
+      return { label, description };
+    })
+    .filter((option): option is RequestUserInputOption => Boolean(option));
+  return options.length ? options : undefined;
+}
+
+function normalizeRequestUserInputQuestions(value: unknown): RequestUserInputQuestion[] {
+  const questionsRaw = Array.isArray(value) ? value : [];
+  return questionsRaw
+    .map((entry) => {
+      const question = asRecord(entry);
+      if (!question) {
+        return null;
+      }
+      const id = asTrimmedString(question.id);
+      if (!id) {
+        return null;
+      }
+      return {
+        id,
+        header: String(question.header ?? ""),
+        question: String(question.question ?? ""),
+        isOther: Boolean(question.isOther ?? question.is_other),
+        options: normalizeRequestUserInputOptions(question.options),
+      };
+    })
+    .filter((question): question is RequestUserInputQuestion => Boolean(question));
+}
 
 function getAppServerMessageObject(
   event: AppServerEvent,
@@ -99,6 +165,29 @@ export function getAppServerRequestId(event: AppServerEvent): string | number | 
     return requestId;
   }
   return null;
+}
+
+export function normalizeRequestUserInputRequest(
+  value: unknown,
+): RequestUserInputRequest | null {
+  const request = asRecord(value);
+  if (!request) {
+    return null;
+  }
+  const params = asRecord(request.params) ?? {};
+  const rawRequestId = request.request_id ?? request.requestId;
+  const requestId =
+    typeof rawRequestId === "number" ? rawRequestId : asTrimmedString(rawRequestId);
+  return {
+    workspace_id: asTrimmedString(request.workspace_id ?? request.workspaceId),
+    request_id: requestId,
+    params: {
+      thread_id: asTrimmedString(params.thread_id ?? params.threadId),
+      turn_id: asTrimmedString(params.turn_id ?? params.turnId),
+      item_id: asTrimmedString(params.item_id ?? params.itemId),
+      questions: normalizeRequestUserInputQuestions(params.questions),
+    },
+  };
 }
 
 export function isApprovalRequestMethod(method: string): boolean {

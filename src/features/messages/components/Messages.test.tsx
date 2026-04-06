@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useCallback, useState } from "react";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConversationItem } from "../../../types";
 import { Messages } from "./Messages";
@@ -845,44 +845,34 @@ describe("Messages", () => {
     expect(container.querySelector(".reasoning-inline")).toBeNull();
   });
 
-  it("shows polling fetch countdown text instead of done duration when requested", () => {
-    vi.useFakeTimers();
-    try {
-      const items: ConversationItem[] = [
-        {
-          id: "assistant-msg-done",
-          kind: "message",
-          role: "assistant",
-          text: "Completed response",
-        },
-      ];
+  it("keeps done duration text even when legacy polling props are passed", () => {
+    const items: ConversationItem[] = [
+      {
+        id: "assistant-msg-done",
+        kind: "message",
+        role: "assistant",
+        text: "Completed response",
+      },
+    ];
 
-      render(
-        <Messages
-          items={items}
-          threadId="thread-1"
-          workspaceId="ws-1"
-          isThinking={false}
-          lastDurationMs={4_000}
-          showPollingFetchStatus
-          pollingIntervalMs={12_000}
-          openTargets={[]}
-          selectedOpenAppId=""
-        />,
-      );
+    render(
+      <Messages
+        items={items}
+        threadId="thread-1"
+        workspaceId="ws-1"
+        isThinking={false}
+        lastDurationMs={4_000}
+        showPollingFetchStatus
+        pollingIntervalMs={12_000}
+        openTargets={[]}
+        selectedOpenAppId=""
+      />,
+    );
 
-      expect(
-        screen.getByText("New message will be fetched in 12 seconds"),
-      ).toBeTruthy();
-      act(() => {
-        vi.advanceTimersByTime(1_000);
-      });
-      expect(
-        screen.getByText("New message will be fetched in 11 seconds"),
-      ).toBeTruthy();
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(screen.getByText("Done in 0:04")).toBeTruthy();
+    expect(
+      screen.queryByText("New message will be fetched in 12 seconds"),
+    ).toBeNull();
   });
 
   it("keeps done duration text when polling fetch countdown is not requested", () => {
@@ -1633,9 +1623,8 @@ describe("Messages", () => {
     expect(screen.getByText("[error] Missing config")).toBeTruthy();
   });
 
-  it("shows a mobile reconnect banner while polling and triggers manual recovery", async () => {
+  it("does not show a mobile reconnect banner while polling", () => {
     isMobilePlatformMock.mockReturnValue(true);
-    const onReconnectAndSync = vi.fn();
 
     render(
       <Messages
@@ -1646,13 +1635,13 @@ describe("Messages", () => {
         showPollingFetchStatus
         openTargets={[]}
         selectedOpenAppId=""
-        onReconnectAndSync={onReconnectAndSync}
+        onReconnectAndSync={vi.fn()}
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /reconnect and sync/i }));
-    await waitFor(() => {
-      expect(onReconnectAndSync).toHaveBeenCalledTimes(1);
-    });
+    expect(
+      screen.queryByText("Connection recovery is available for this thread."),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: /reconnect and sync/i })).toBeNull();
   });
 });

@@ -1217,6 +1217,64 @@ describe("tauri invoke wrappers", () => {
     });
   });
 
+  it("normalizes pending user input requests returned with camelCase params", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({
+      approvals: [],
+      userInputRequests: [
+        {
+          workspace_id: "ws-10",
+          request_id: "request-10",
+          params: {
+            threadId: "thread-10",
+            turnId: "turn-10",
+            itemId: "item-10",
+            questions: [
+              {
+                id: "confirm",
+                header: "Confirm",
+                question: "Proceed?",
+                is_other: true,
+                options: [
+                  { label: "Yes", description: "Continue." },
+                  { label: "", description: "" },
+                  { label: "", description: "Needs review" },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    await expect(listPendingServerRequests("ws-10", "thread-10")).resolves.toEqual({
+      approvals: [],
+      userInputRequests: [
+        {
+          workspace_id: "ws-10",
+          request_id: "request-10",
+          params: {
+            thread_id: "thread-10",
+            turn_id: "turn-10",
+            item_id: "item-10",
+            questions: [
+              {
+                id: "confirm",
+                header: "Confirm",
+                question: "Proceed?",
+                isOther: true,
+                options: [
+                  { label: "Yes", description: "Continue." },
+                  { label: "", description: "Needs review" },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    });
+  });
+
   it("sends a notification without re-requesting permission when already granted", async () => {
     const isPermissionGrantedMock = vi.mocked(notification.isPermissionGranted);
     const requestPermissionMock = vi.mocked(notification.requestPermission);

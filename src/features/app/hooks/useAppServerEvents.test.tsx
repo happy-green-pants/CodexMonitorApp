@@ -403,6 +403,63 @@ describe("useAppServerEvents", () => {
     expect(unlisten).toHaveBeenCalledTimes(1);
   });
 
+  it("normalizes requestUserInput events delivered with camelCase params", async () => {
+    const handlers: Handlers = {
+      onRequestUserInput: vi.fn(),
+    };
+    const { root } = await mount(handlers);
+
+    await act(async () => {
+      listener?.({
+        workspace_id: "ws-camel",
+        message: {
+          method: "item/tool/requestUserInput",
+          id: "request-camel",
+          params: {
+            threadId: "thread-camel",
+            turnId: "turn-camel",
+            itemId: "item-camel",
+            questions: [
+              {
+                id: "choice",
+                header: "Pick one",
+                question: "Choose a path",
+                is_other: true,
+                options: [
+                  { label: "A", description: "Path A" },
+                  { label: "", description: "" },
+                ],
+              },
+            ],
+          },
+        },
+      });
+    });
+
+    expect(handlers.onRequestUserInput).toHaveBeenCalledWith({
+      workspace_id: "ws-camel",
+      request_id: "request-camel",
+      params: {
+        thread_id: "thread-camel",
+        turn_id: "turn-camel",
+        item_id: "item-camel",
+        questions: [
+          {
+            id: "choice",
+            header: "Pick one",
+            question: "Choose a path",
+            isOther: true,
+            options: [{ label: "A", description: "Path A" }],
+          },
+        ],
+      },
+    });
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
   it("normalizes request user input questions and options", async () => {
     const handlers: Handlers = {
       onRequestUserInput: vi.fn(),

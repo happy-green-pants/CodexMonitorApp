@@ -235,8 +235,12 @@ export const Sidebar = memo(function Sidebar({
       new Set(
         userInputRequests
           .map((request) => {
-            const workspaceId = request.workspace_id.trim();
-            const threadId = request.params.thread_id.trim();
+            const workspaceId =
+              typeof request.workspace_id === "string" ? request.workspace_id.trim() : "";
+            const threadId =
+              typeof request.params?.thread_id === "string"
+                ? request.params.thread_id.trim()
+                : "";
             return workspaceId && threadId ? `${workspaceId}:${threadId}` : "";
           })
           .filter(Boolean),

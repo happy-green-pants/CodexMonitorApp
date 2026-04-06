@@ -617,7 +617,6 @@ export default function MainApp() {
     reconnectWorkspace: connectWorkspace,
     syncPendingServerRequests,
   });
-
   const handleMobileThreadRefresh = useCallback(() => {
     if (mobileThreadRefreshLoading || !activeWorkspace) {
       return;
@@ -1651,16 +1650,6 @@ export default function MainApp() {
     Boolean(activeWorkspace) &&
     isCompact &&
     ((isPhone && activeTab === "codex") || (isTablet && tabletTab === "codex"));
-  const showMobilePollingFetchStatus =
-    showCompactCodexThreadActions &&
-    Boolean(activeWorkspace?.connected) &&
-    appSettings.backendMode === "remote" &&
-    remoteThreadConnectionState === "polling";
-  const showMobileReconnectBanner =
-    showCompactCodexThreadActions &&
-    appSettings.backendMode === "remote" &&
-    Boolean(activeThreadId) &&
-    remoteThreadConnectionState !== "live";
   const gitRootOverride = activeWorkspace?.settings.gitRoot;
   const hasGitRootOverride =
     typeof gitRootOverride === "string" && gitRootOverride.trim().length > 0;
@@ -1941,10 +1930,6 @@ export default function MainApp() {
     activeTab,
     setActiveTab,
     tabletTab,
-    showMobilePollingFetchStatus,
-    showMobileReconnectBanner,
-    mobileReconnectLoading: mobileThreadRefreshLoading,
-    onMobileReconnectAndSync: handleMobileThreadRefresh,
     appModalsAboutOpen:
       appModalsProps.settingsOpen && appModalsProps.settingsSection === 'about',
     updaterState,

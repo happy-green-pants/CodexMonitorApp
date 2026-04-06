@@ -10,6 +10,7 @@ import {
   getAppServerRawMethod,
   getAppServerRequestId,
   isApprovalRequestMethod,
+  normalizeRequestUserInputRequest,
   isSupportedAppServerMethod,
 } from "../../../utils/appServerEvents";
 import type { SupportedAppServerMethod } from "../../../utils/appServerEvents";
@@ -214,41 +215,14 @@ export function useAppServerEvents(handlers: AppServerEventHandlers) {
       }
 
       if (method === "item/tool/requestUserInput" && hasRequestId) {
-        const questionsRaw = Array.isArray(params.questions) ? params.questions : [];
-        const questions = questionsRaw
-          .map((entry) => {
-            const question = entry as Record<string, unknown>;
-            const optionsRaw = Array.isArray(question.options) ? question.options : [];
-            const options = optionsRaw
-              .map((option) => {
-                const record = option as Record<string, unknown>;
-                const label = String(record.label ?? "").trim();
-                const description = String(record.description ?? "").trim();
-                if (!label && !description) {
-                  return null;
-                }
-                return { label, description };
-              })
-              .filter((option): option is { label: string; description: string } => Boolean(option));
-            return {
-              id: String(question.id ?? "").trim(),
-              header: String(question.header ?? ""),
-              question: String(question.question ?? ""),
-              isOther: Boolean(question.isOther ?? question.is_other),
-              options: options.length ? options : undefined,
-            };
-          })
-          .filter((question) => question.id);
-        currentHandlers.onRequestUserInput?.({
+        const request = normalizeRequestUserInputRequest({
           workspace_id,
-          request_id: requestId as string | number,
-          params: {
-            thread_id: String(params.threadId ?? params.thread_id ?? ""),
-            turn_id: String(params.turnId ?? params.turn_id ?? ""),
-            item_id: String(params.itemId ?? params.item_id ?? ""),
-            questions,
-          },
+          request_id: requestId,
+          params,
         });
+        if (request) {
+          currentHandlers.onRequestUserInput?.(request);
+        }
         return;
       }
 

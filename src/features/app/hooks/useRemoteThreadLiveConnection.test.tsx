@@ -94,7 +94,7 @@ describe("useRemoteThreadLiveConnection", () => {
     vi.useRealTimers();
   });
 
-  it("degrades to polling and shows toast when app-server event stream errors", async () => {
+  it("degrades to polling without toast when app-server event stream errors", async () => {
     const refreshThread = vi.fn().mockResolvedValue(undefined);
 
     const { result } = renderHook(() =>
@@ -128,7 +128,7 @@ describe("useRemoteThreadLiveConnection", () => {
     });
 
     expect(result.current.connectionState).toBe("polling");
-    expect(pushErrorToastMock).toHaveBeenCalledTimes(1);
+    expect(pushErrorToastMock).toHaveBeenCalledTimes(0);
     expect(refreshThread).toHaveBeenCalledTimes(1);
   });
 
@@ -168,7 +168,7 @@ describe("useRemoteThreadLiveConnection", () => {
     expect(pushErrorToastMock).toHaveBeenCalledTimes(0);
   });
 
-  it("degrades to polling and refreshes when live stream stalls while processing", async () => {
+  it("degrades to polling and refreshes without toast when live stream stalls while processing", async () => {
     const refreshThread = vi.fn().mockResolvedValue(undefined);
 
     const { result } = renderHook(() =>
@@ -199,7 +199,7 @@ describe("useRemoteThreadLiveConnection", () => {
     });
 
     expect(result.current.connectionState).toBe("polling");
-    expect(pushErrorToastMock).toHaveBeenCalledTimes(1);
+    expect(pushErrorToastMock).toHaveBeenCalledTimes(0);
     expect(refreshThread).toHaveBeenCalledTimes(1);
   });
 

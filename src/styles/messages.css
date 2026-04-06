@@ -118,62 +118,6 @@
   white-space: nowrap;
 }
 
-.messages-reconnect-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 8px 24px 14px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid var(--border-subtle);
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--surface-card) 92%, transparent), var(--surface-card));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-}
-
-.messages-reconnect-copy {
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.messages-reconnect-button {
-  flex: 0 0 auto;
-  min-width: 138px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface-card-strong);
-  color: var(--text-stronger);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
-}
-
-.messages-reconnect-button:hover:not(:disabled) {
-  background: var(--surface-hover);
-  border-color: var(--accent-border, var(--border-strong));
-  transform: translateY(-1px);
-}
-
-.messages-reconnect-button:disabled {
-  opacity: 0.7;
-  cursor: progress;
-}
-
-@media (max-width: 720px) {
-  .messages-reconnect-banner {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .messages-reconnect-button {
-    width: 100%;
-  }
-}
-
 @keyframes working-spin {
   to {
     transform: rotate(360deg);

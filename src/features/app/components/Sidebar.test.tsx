@@ -572,4 +572,49 @@ describe("Sidebar", () => {
     const indicator = screen.queryByTitle("Streaming updates in progress");
     expect(indicator).toBeNull();
   });
+
+  it("ignores malformed user input requests without crashing", () => {
+    render(
+      <Sidebar
+        {...baseProps}
+        workspaces={[
+          {
+            id: "ws-1",
+            name: "Workspace",
+            path: "/tmp/workspace",
+            connected: true,
+            settings: { sidebarCollapsed: false },
+          },
+        ]}
+        groupedWorkspaces={[
+          {
+            id: null,
+            name: "Workspaces",
+            workspaces: [
+              {
+                id: "ws-1",
+                name: "Workspace",
+                path: "/tmp/workspace",
+                connected: true,
+                settings: { sidebarCollapsed: false },
+              },
+            ],
+          },
+        ]}
+        userInputRequests={[
+          {
+            workspace_id: "ws-1",
+            request_id: "request-1",
+            params: {
+              turn_id: "turn-1",
+              item_id: "item-1",
+              questions: [],
+            },
+          } as never,
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Workspace")).toBeTruthy();
+  });
 });

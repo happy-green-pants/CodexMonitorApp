@@ -69,3 +69,15 @@ State Summary (from `changelog_v12.md`):
 - **Why**: 本轮修复要求先用失败测试锁定“远程移动端被 heavy Git 自动链路拖慢”的具体行为，再反推最小实现，避免只做表层限流。
 - **Goal**: 为 heavy Git workspace 降级实现提供明确红灯测试，并把当前任务切换到远程移动端连接稳定性修复。
 ---
+### [2026-04-06 17:11] | Agent: Codex (GPT-5)
+- **File**: `/src/utils/appServerEvents.ts`, `/src/features/app/hooks/useAppServerEvents.ts`, `/src/services/tauri.ts`, `/src/features/app/components/Sidebar.tsx`, `/src/services/tauri.test.ts`, `/src/features/app/hooks/useAppServerEvents.test.tsx`, `/src/features/app/components/Sidebar.test.tsx`, `/.dev_logs/manifest.md`
+- **Change**: 抽出共享 `requestUserInput` 归一化函数，统一兼容 `threadId/thread_id`、`turnId/turn_id`、`itemId/item_id` 与问题选项的清洗；让 `listPendingServerRequests()` 与 `useAppServerEvents()` 共用同一入口；为 Sidebar 的 pending key 计算补充缺字段防御；新增 pending 快照 camelCase、live 事件 camelCase 与 Sidebar 坏数据不崩溃三类回归测试。
+- **Why**: 浏览器远程模式下 `list_pending_server_requests` 会把后端原始 camelCase `params` 直接透传到前端，而多个消费点默认读取 snake_case `params.thread_id`；Sidebar 是第一个触发 `trim()` 空引用崩溃的组件，但消息区、通知与响应必需判断也存在同类结构依赖。
+- **Goal**: 让网页版、桌面端与移动端都消费同一份稳定的 `RequestUserInputRequest` 形状，消除 pending/live 结构漂移，并把 malformed request 从“整栏崩溃”降级为“忽略坏数据”。
+---
+### [2026-04-06 18:18] | Agent: Codex (GPT-5)
+- **File**: `/src/features/app/hooks/useRemoteThreadLiveConnection.ts`, `/src/features/app/components/MainApp.tsx`, `/src/features/app/hooks/useMainAppLayoutSurfaces.ts`, `/src/features/messages/components/Messages.tsx`, `/src/features/messages/components/MessageRows.tsx`, `/src/features/app/hooks/useRemoteThreadLiveConnection.test.tsx`, `/src/features/messages/components/Messages.test.tsx`, `/.dev_logs/manifest.md`
+- **Change**: 移除远程线程实时流报错/卡死时的 toast 提示；停用消息区 `Reconnect and Sync` 横幅与轮询倒计时文案；保留 `Messages` 旧 props 作为兼容壳层但不再生效；将测试改为断言仅通过右上角连接标签表达状态。
+- **Why**: 用户要求流断开时不再弹提示，也不再通过消息区额外提示表达轮询/恢复状态，只通过右上角 `Polling` 标签判断即可。
+- **Goal**: 让远程流从 `live` 静默降级为 `polling` 或 `disconnected` 时不打断使用体验，同时保留原有自动刷新、自动重连和手动刷新能力。
+---

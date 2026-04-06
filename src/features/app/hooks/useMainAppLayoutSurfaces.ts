@@ -2,10 +2,6 @@ import type { RefObject } from "react";
 import type { AppSettings, ComposerEditorSettings, WorkspaceInfo } from "@/types";
 import type { ThreadState } from "@/features/threads/hooks/useThreadsReducer";
 import type { WorkspaceLaunchScriptsState } from "@app/hooks/useWorkspaceLaunchScripts";
-import {
-  REMOTE_THREAD_POLL_INTERVAL_MS,
-  REMOTE_THREAD_POLL_INTERVAL_MS_WHILE_PROCESSING,
-} from "@app/hooks/useRemoteThreadRefreshOnFocus";
 import type { useMainAppComposerWorkspaceState } from "@app/hooks/useMainAppComposerWorkspaceState";
 import type { useMainAppDisplayNodes } from "@app/hooks/useMainAppDisplayNodes";
 import type { useMainAppGitState } from "@app/hooks/useMainAppGitState";
@@ -217,10 +213,6 @@ type UseMainAppLayoutSurfacesArgs = {
   activeTab: LayoutNodesOptions["primary"]["tabBarProps"]["activeTab"];
   setActiveTab: (tab: "home" | "projects" | "codex" | "git" | "log") => void;
   tabletTab: LayoutNodesOptions["primary"]["tabletNavProps"]["activeTab"];
-  showMobilePollingFetchStatus: boolean;
-  showMobileReconnectBanner: boolean;
-  mobileReconnectLoading: boolean;
-  onMobileReconnectAndSync: () => void;
   appModalsAboutOpen: boolean;
   updaterState: LayoutNodesOptions["primary"]["updateToastProps"]["state"];
   startUpdate: LayoutNodesOptions["primary"]["updateToastProps"]["onUpdate"];
@@ -381,10 +373,6 @@ export function useMainAppLayoutSurfaces({
   activeTab,
   setActiveTab,
   tabletTab,
-  showMobilePollingFetchStatus,
-  showMobileReconnectBanner,
-  mobileReconnectLoading,
-  onMobileReconnectAndSync,
   appModalsAboutOpen,
   updaterState,
   startUpdate,
@@ -398,11 +386,6 @@ export function useMainAppLayoutSurfaces({
 }: UseMainAppLayoutSurfacesArgs): LayoutNodesOptions {
   const sidebarRateLimits = activeWorkspace ? activeRateLimits : homeRateLimits;
   const sidebarAccount = activeWorkspace ? activeAccount : homeAccount;
-  const pollingIntervalMs =
-    showMobilePollingFetchStatus &&
-    Boolean(activeThreadId && threadStatusById[activeThreadId]?.isProcessing)
-      ? REMOTE_THREAD_POLL_INTERVAL_MS_WHILE_PROCESSING
-      : REMOTE_THREAD_POLL_INTERVAL_MS;
 
   return {
     primary: {
@@ -493,11 +476,6 @@ export function useMainAppLayoutSurfaces({
         lastDurationMs: activeThreadId
           ? threadStatusById[activeThreadId]?.lastDurationMs ?? null
           : null,
-        showPollingFetchStatus: showMobilePollingFetchStatus,
-        showReconnectBanner: showMobileReconnectBanner,
-        reconnectLoading: mobileReconnectLoading,
-        onReconnectAndSync: onMobileReconnectAndSync,
-        pollingIntervalMs,
       },
       composerProps: composerWorkspaceState.showComposer
         ? {

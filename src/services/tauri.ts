@@ -7,6 +7,7 @@ import {
   loadBrowserRemoteSettings,
   saveBrowserRemoteSettings,
 } from "./browserRemote";
+import { normalizeRequestUserInputRequest } from "../utils/appServerEvents";
 import type {
   AppSettings,
   ApprovalRequest,
@@ -709,10 +710,18 @@ export async function listPendingServerRequests(
   workspaceId: string,
   threadId?: string | null,
 ) {
-  return invoke<PendingServerRequestsResponse>("list_pending_server_requests", {
+  const response = await invoke<PendingServerRequestsResponse>("list_pending_server_requests", {
     workspaceId,
     threadId: threadId ?? null,
   });
+  return {
+    approvals: Array.isArray(response?.approvals) ? response.approvals : [],
+    userInputRequests: Array.isArray(response?.userInputRequests)
+      ? response.userInputRequests
+          .map((entry) => normalizeRequestUserInputRequest(entry))
+          .filter((entry): entry is RequestUserInputRequest => Boolean(entry))
+      : [],
+  };
 }
 
 export async function rememberApprovalRule(
