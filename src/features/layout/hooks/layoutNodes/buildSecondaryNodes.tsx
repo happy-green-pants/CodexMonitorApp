@@ -71,14 +71,27 @@ export function buildSecondaryNodes(options: SecondaryLayoutNodesOptions): Secon
   const compactGitDiffActive =
     options.compactNavProps.centerMode === "diff" &&
     Boolean(options.compactNavProps.selectedDiffPath);
+  const compactWorkspaceFileActive =
+    options.compactNavProps.centerMode === "file" &&
+    Boolean(options.compactNavProps.activeWorkspaceFilePath);
   const compactGitBackNode = (
     <div className="compact-git-back">
       <button
         type="button"
-        className={`compact-git-switch-button${compactGitDiffActive ? "" : " active"}`}
+        className={`compact-git-switch-button${
+          compactGitDiffActive || compactWorkspaceFileActive ? "" : " active"
+        }`}
         onClick={options.compactNavProps.onBackFromDiff}
       >
         Files
+      </button>
+      <button
+        type="button"
+        className={`compact-git-switch-button${compactWorkspaceFileActive ? " active" : ""}`}
+        onClick={options.compactNavProps.onShowActiveFile}
+        disabled={!options.compactNavProps.hasActiveWorkspaceFile}
+      >
+        Editor
       </button>
       <button
         type="button"

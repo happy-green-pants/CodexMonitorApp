@@ -19,7 +19,7 @@ type PhoneLayoutProps = {
   messagesNode: ReactNode;
   composerNode: ReactNode;
   gitDiffPanelNode: ReactNode;
-  gitDiffViewerNode: ReactNode;
+  centerDetailNode: ReactNode;
   debugPanelNode: ReactNode;
 };
 
@@ -41,7 +41,7 @@ export function PhoneLayout({
   messagesNode,
   composerNode,
   gitDiffPanelNode,
-  gitDiffViewerNode,
+  centerDetailNode,
   debugPanelNode,
 }: PhoneLayoutProps) {
   return (
@@ -80,7 +80,7 @@ export function PhoneLayout({
               />
               {compactGitBackNode}
               {showGitDetail ? (
-                <div className="compact-git-viewer">{gitDiffViewerNode}</div>
+                <div className="compact-git-viewer">{centerDetailNode}</div>
               ) : (
                 <div className="compact-git">
                   <div className="compact-git-list">{gitDiffPanelNode}</div>

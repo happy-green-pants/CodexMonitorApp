@@ -174,6 +174,12 @@ struct DaemonState {
 struct WorkspaceFileResponse {
     content: String,
     truncated: bool,
+    revision: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct WorkspaceFileWriteResponse {
+    revision: String,
 }
 
 #[derive(Serialize)]
@@ -680,6 +686,26 @@ impl DaemonState {
         workspaces_core::read_workspace_file_core(&self.workspaces, &workspace_id, &path, |root, rel| {
             read_workspace_file_inner(root, rel)
         })
+        .await
+    }
+
+    async fn write_workspace_file(
+        &self,
+        workspace_id: String,
+        path: String,
+        content: String,
+        expected_revision: Option<String>,
+    ) -> Result<WorkspaceFileWriteResponse, String> {
+        workspaces_core::write_workspace_file_core(
+            &self.workspaces,
+            &workspace_id,
+            &path,
+            &content,
+            expected_revision.as_deref(),
+            |root, rel, next_content, expected| {
+                write_workspace_file_inner(root, rel, next_content, expected)
+            },
+        )
         .await
     }
 
@@ -1518,7 +1544,14 @@ fn list_workspace_files_inner(root: &PathBuf, max_files: usize) -> Vec<String> {
         }
         if let Ok(rel_path) = entry.path().strip_prefix(root) {
             let normalized = normalize_git_path(&rel_path.to_string_lossy());
-            if !normalized.is_empty() {
+            let is_hidden_path = normalized
+                .split('/')
+                .any(|segment| segment.starts_with('.') && segment != "." && segment != "..");
+            let keep_hidden = normalized == ".env"
+                || normalized.starts_with(".env.")
+                || normalized.starts_with(".github/")
+                || normalized.starts_with(".vscode/");
+            if !normalized.is_empty() && (!is_hidden_path || keep_hidden) {
                 results.push(normalized);
             }
         }
@@ -1565,7 +1598,69 @@ fn read_workspace_file_inner(
     }
 
     let content = String::from_utf8(buffer).map_err(|_| "File is not valid UTF-8".to_string())?;
-    Ok(WorkspaceFileResponse { content, truncated })
+    let revision = {
+        use sha2::{Digest, Sha256};
+
+        let modified_ms = metadata
+            .modified()
+            .ok()
+            .and_then(|value| value.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|value| value.as_millis())
+            .unwrap_or(0);
+        let mut hasher = Sha256::new();
+        hasher.update(metadata.len().to_string().as_bytes());
+        hasher.update(b":");
+        hasher.update(modified_ms.to_string().as_bytes());
+        hasher.update(b":");
+        hasher.update(content.as_bytes());
+        format!("sha256:{:x}", hasher.finalize())
+    };
+    Ok(WorkspaceFileResponse {
+        content,
+        truncated,
+        revision,
+    })
+}
+
+fn write_workspace_file_inner(
+    root: &PathBuf,
+    relative_path: &str,
+    content: &str,
+    expected_revision: Option<&str>,
+) -> Result<WorkspaceFileWriteResponse, String> {
+    let canonical_root = root
+        .canonicalize()
+        .map_err(|err| format!("Failed to resolve workspace root: {err}"))?;
+    let candidate = canonical_root.join(relative_path);
+    let parent = candidate
+        .parent()
+        .ok_or_else(|| "Invalid file path".to_string())?;
+    let canonical_parent = parent
+        .canonicalize()
+        .map_err(|err| format!("Failed to resolve file parent: {err}"))?;
+    if !canonical_parent.starts_with(&canonical_root) {
+        return Err("Invalid file path".to_string());
+    }
+
+    if candidate.exists() {
+        let current = read_workspace_file_inner(root, relative_path)?;
+        if current.truncated {
+            return Err("File is too large to edit safely".to_string());
+        }
+        if let Some(expected_revision) = expected_revision {
+            if current.revision != expected_revision {
+                return Err("Workspace file revision conflict".to_string());
+            }
+        }
+    } else if expected_revision.is_some() {
+        return Err("Workspace file revision conflict".to_string());
+    }
+
+    std::fs::write(&candidate, content).map_err(|err| format!("Failed to write file: {err}"))?;
+    let updated = read_workspace_file_inner(root, relative_path)?;
+    Ok(WorkspaceFileWriteResponse {
+        revision: updated.revision,
+    })
 }
 
 fn default_data_dir() -> PathBuf {

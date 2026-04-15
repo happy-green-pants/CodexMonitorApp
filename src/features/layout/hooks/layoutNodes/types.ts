@@ -7,6 +7,7 @@ import { TabletNav } from "../../../app/components/TabletNav";
 import { Composer } from "../../../composer/components/Composer";
 import { DebugPanel } from "../../../debug/components/DebugPanel";
 import { FileTreePanel } from "../../../files/components/FileTreePanel";
+import { WorkspaceFileEditor } from "../../../files/components/WorkspaceFileEditor";
 import { GitDiffPanel } from "../../../git/components/GitDiffPanel";
 import { GitDiffViewer } from "../../../git/components/GitDiffViewer";
 import { Home } from "../../../home/components/Home";
@@ -57,11 +58,12 @@ export type LayoutPrimarySurface = {
 export type LayoutGitSurface = {
   filePanelMode: ComponentProps<typeof GitDiffPanel>["filePanelMode"];
   fileTreeProps: ComponentProps<typeof FileTreePanel> | null;
+  workspaceFileEditorProps: ComponentProps<typeof WorkspaceFileEditor> | null;
   promptPanelProps: ComponentProps<typeof PromptPanel>;
   gitDiffPanelProps: ComponentProps<typeof GitDiffPanel>;
   gitDiffViewerProps: ComponentProps<typeof GitDiffViewer>;
   diffViewProps: {
-    centerMode: "chat" | "diff";
+    centerMode: "chat" | "diff" | "file";
     isPhone: boolean;
     splitChatDiffView: boolean;
     gitDiffViewStyle: "split" | "unified";
@@ -75,11 +77,14 @@ export type LayoutSecondarySurface = {
   debugPanelProps: ComponentProps<typeof DebugPanel>;
   compactNavProps: {
     onGoProjects: () => void;
-    centerMode: "chat" | "diff";
+    centerMode: "chat" | "diff" | "file";
     selectedDiffPath: string | null;
+    activeWorkspaceFilePath: string | null;
     onBackFromDiff: () => void;
     onShowSelectedDiff: () => void;
+    onShowActiveFile: () => void;
     hasActiveGitDiffs: boolean;
+    hasActiveWorkspaceFile: boolean;
   };
 };
 
@@ -102,7 +107,7 @@ export type LayoutNodesResult = {
   tabletNavNode: ReactNode;
   tabBarNode: ReactNode;
   gitDiffPanelNode: ReactNode;
-  gitDiffViewerNode: ReactNode;
+  centerDetailNode: ReactNode;
   planPanelNode: ReactNode;
   debugPanelNode: ReactNode;
   debugPanelFullNode: ReactNode;

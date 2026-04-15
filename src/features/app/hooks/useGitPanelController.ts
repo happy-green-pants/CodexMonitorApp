@@ -12,6 +12,8 @@ import { useGitCommitDiffs } from "../../git/hooks/useGitCommitDiffs";
 import type { GitDiffSource, GitPanelMode } from "../../git/types";
 import { buildPerFileThreadDiffs } from "../../git/utils/perFileThreadDiffs";
 
+type CenterMode = "chat" | "diff" | "file";
+
 export function useGitPanelController({
   activeWorkspace,
   activeItems,
@@ -41,8 +43,9 @@ export function useGitPanelController({
   prDiffsLoading: boolean;
   prDiffsError: string | null;
 }) {
-  const [centerMode, setCenterMode] = useState<"chat" | "diff">("chat");
+  const [centerMode, setCenterMode] = useState<CenterMode>("chat");
   const [selectedDiffPath, setSelectedDiffPath] = useState<string | null>(null);
+  const [activeWorkspaceFilePath, setActiveWorkspaceFilePath] = useState<string | null>(null);
   const [diffScrollRequestId, setDiffScrollRequestId] = useState(0);
   const pendingDiffScrollRef = useRef(false);
   const [gitPanelMode, setGitPanelMode] = useState<GitPanelMode>("diff");
@@ -211,6 +214,7 @@ export function useGitPanelController({
       setSelectedDiffPath(path);
       pendingDiffScrollRef.current = true;
       setCenterMode("diff");
+      setActiveWorkspaceFilePath(null);
       setGitPanelMode("diff");
       setDiffSource("local");
       setSelectedCommitSha(null);
@@ -228,6 +232,7 @@ export function useGitPanelController({
       setSelectedDiffPath(null);
       pendingDiffScrollRef.current = true;
       setCenterMode("diff");
+      setActiveWorkspaceFilePath(null);
       setGitPanelMode("log");
       setDiffSource("commit");
       setSelectedPullRequest(null);
@@ -242,11 +247,23 @@ export function useGitPanelController({
     setSelectedDiffPath(path);
   }, []);
 
+  const openWorkspaceFile = useCallback(
+    (path: string) => {
+      setActiveWorkspaceFilePath(path);
+      setCenterMode("file");
+      if (isCompact) {
+        setActiveTab("git");
+      }
+    },
+    [isCompact, setActiveTab],
+  );
+
   const handleSelectPerFileDiff = useCallback(
     (path: string) => {
       setSelectedDiffPath(path);
       pendingDiffScrollRef.current = true;
       setCenterMode("diff");
+      setActiveWorkspaceFilePath(null);
       setGitPanelMode("perFile");
       setDiffSource("perFile");
       setSelectedCommitSha(null);
@@ -316,6 +333,7 @@ export function useGitPanelController({
     setCenterMode,
     selectedDiffPath,
     setSelectedDiffPath,
+    activeWorkspaceFilePath,
     diffScrollRequestId,
     gitPanelMode,
     setGitPanelMode,
@@ -357,6 +375,7 @@ export function useGitPanelController({
     handleSelectPerFileDiff,
     handleSelectCommit,
     handleActiveDiffPath,
+    openWorkspaceFile,
     handleGitPanelModeChange,
     perFileDiffGroups,
     compactTab,

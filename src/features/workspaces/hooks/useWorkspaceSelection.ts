@@ -12,7 +12,7 @@ type UseWorkspaceSelectionOptions = {
     workspaceId: string,
     settings: Partial<WorkspaceSettings>,
   ) => Promise<WorkspaceInfo>;
-  setCenterMode: (mode: "chat" | "diff") => void;
+  setCenterMode: (mode: "chat" | "diff" | "file") => void;
   setSelectedDiffPath: (path: string | null) => void;
 };
 

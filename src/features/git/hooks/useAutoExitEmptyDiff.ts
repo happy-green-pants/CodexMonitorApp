@@ -1,14 +1,14 @@
 import { useEffect } from "react";
 
 type AutoExitEmptyDiffOptions = {
-  centerMode: "chat" | "diff";
+  centerMode: "chat" | "diff" | "file";
   autoExitEnabled: boolean;
   activeDiffCount: number;
   activeDiffLoading: boolean;
   activeDiffError: string | null;
   activeThreadId: string | null;
   isCompact: boolean;
-  setCenterMode: (mode: "chat" | "diff") => void;
+  setCenterMode: (mode: "chat" | "diff" | "file") => void;
   setSelectedDiffPath: (path: string | null) => void;
   setActiveTab: (tab: "home" | "projects" | "codex" | "git" | "log") => void;
 };

@@ -28,12 +28,12 @@ type UsePullRequestComposerOptions = {
   selectedCommit: GitLogEntry | null;
   filePanelMode: "git" | "files" | "prompts";
   gitPanelMode: GitPanelMode;
-  centerMode: "chat" | "diff";
+  centerMode: "chat" | "diff" | "file";
   isCompact: boolean;
   setSelectedPullRequest: (pullRequest: GitHubPullRequest | null) => void;
   setDiffSource: (source: GitDiffSource) => void;
   setSelectedDiffPath: (path: string | null) => void;
-  setCenterMode: (mode: "chat" | "diff") => void;
+  setCenterMode: (mode: "chat" | "diff" | "file") => void;
   setGitPanelMode: (mode: GitPanelMode) => void;
   setPrefillDraft: (draft: { id: string; text: string; createdAt: number }) => void;
   setActiveTab: (tab: "home" | "projects" | "codex" | "git" | "log") => void;

@@ -10,7 +10,7 @@ type AppLayoutProps = {
   showGitDetail: boolean;
   activeTab: "home" | "projects" | "codex" | "git" | "log";
   tabletTab: "codex" | "git" | "log";
-  centerMode: "chat" | "diff";
+  centerMode: "chat" | "diff" | "file";
   preloadGitDiffs: boolean;
   splitChatDiffView: boolean;
   hasActivePlan: boolean;
@@ -28,7 +28,7 @@ type AppLayoutProps = {
   tabletNavNode: ReactNode;
   tabBarNode: ReactNode;
   gitDiffPanelNode: ReactNode;
-  gitDiffViewerNode: ReactNode;
+  centerDetailNode: ReactNode;
   planPanelNode: ReactNode;
   debugPanelNode: ReactNode;
   debugPanelFullNode: ReactNode;
@@ -67,7 +67,7 @@ export const AppLayout = memo(function AppLayout({
   tabletNavNode,
   tabBarNode,
   gitDiffPanelNode,
-  gitDiffViewerNode,
+  centerDetailNode,
   planPanelNode,
   debugPanelNode,
   debugPanelFullNode,
@@ -100,7 +100,7 @@ export const AppLayout = memo(function AppLayout({
         messagesNode={messagesNode}
         composerNode={composerNode}
         gitDiffPanelNode={gitDiffPanelNode}
-        gitDiffViewerNode={gitDiffViewerNode}
+        centerDetailNode={centerDetailNode}
         debugPanelNode={debugPanelFullNode}
       />
     );
@@ -124,7 +124,7 @@ export const AppLayout = memo(function AppLayout({
         messagesNode={messagesNode}
         composerNode={composerNode}
         gitDiffPanelNode={gitDiffPanelNode}
-        gitDiffViewerNode={gitDiffViewerNode}
+        centerDetailNode={centerDetailNode}
         debugPanelNode={debugPanelFullNode}
       />
     );
@@ -145,7 +145,7 @@ export const AppLayout = memo(function AppLayout({
       preloadGitDiffs={preloadGitDiffs}
       splitChatDiffView={splitChatDiffView}
       messagesNode={messagesNode}
-      gitDiffViewerNode={gitDiffViewerNode}
+      centerDetailNode={centerDetailNode}
       gitDiffPanelNode={gitDiffPanelNode}
       planPanelNode={planPanelNode}
       composerNode={composerNode}

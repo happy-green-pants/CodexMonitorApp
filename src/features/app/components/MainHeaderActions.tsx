@@ -8,7 +8,7 @@ import {
 } from "../../layout/components/SidebarToggleControls";
 
 type MainHeaderActionsProps = {
-  centerMode: "chat" | "diff";
+  centerMode: "chat" | "diff" | "file";
   gitDiffViewStyle: "split" | "unified";
   onSelectDiffViewStyle: (style: "split" | "unified") => void;
   isCompact: boolean;

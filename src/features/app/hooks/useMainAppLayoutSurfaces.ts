@@ -656,7 +656,7 @@ export function useMainAppLayoutSurfaces({
           }
         : null,
       desktopTopbarProps: {
-        showBackToChat: gitState.centerMode === "diff",
+        showBackToChat: gitState.centerMode !== "chat",
         onExitDiff: () => {
           gitState.setCenterMode("chat");
           gitState.setSelectedDiffPath(null);
@@ -701,8 +701,18 @@ export function useMainAppLayoutSurfaces({
             openAppIconById,
             selectedOpenAppId: appSettings.selectedOpenAppId,
             onSelectOpenAppId: handleSelectOpenAppId,
+            onOpenFile: gitState.openWorkspaceFile,
           }
         : null,
+      workspaceFileEditorProps:
+        activeWorkspace && gitState.activeWorkspaceFilePath
+          ? {
+              workspaceId: activeWorkspace.id,
+              workspaceName: activeWorkspace.name,
+              path: gitState.activeWorkspaceFilePath,
+              onSaved: gitState.queueGitStatusRefresh,
+            }
+          : null,
       promptPanelProps: {
         prompts,
         workspacePath: activeWorkspace?.path ?? null,
@@ -887,8 +897,18 @@ export function useMainAppLayoutSurfaces({
         onGoProjects: () => setActiveTab("projects"),
         centerMode: gitState.centerMode,
         selectedDiffPath: gitState.selectedDiffPath,
+        activeWorkspaceFilePath: gitState.activeWorkspaceFilePath,
         onBackFromDiff: () => {
           gitState.setCenterMode("chat");
+        },
+        onShowActiveFile: () => {
+          if (!gitState.activeWorkspaceFilePath) {
+            return;
+          }
+          gitState.setCenterMode("file");
+          if (isPhone) {
+            setActiveTab("git");
+          }
         },
         onShowSelectedDiff: () => {
           const fallbackPath = gitState.selectedDiffPath ?? gitState.activeDiffs[0]?.path;
@@ -907,6 +927,7 @@ export function useMainAppLayoutSurfaces({
           }
         },
         hasActiveGitDiffs: gitState.activeDiffs.length > 0,
+        hasActiveWorkspaceFile: Boolean(gitState.activeWorkspaceFilePath),
       },
     },
   };

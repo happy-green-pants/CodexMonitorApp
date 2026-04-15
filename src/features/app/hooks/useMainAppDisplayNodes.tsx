@@ -7,7 +7,7 @@ type UseMainAppDisplayNodesArgs = {
   showCompactCodexThreadActions: boolean;
   handleMobileThreadRefresh: () => void;
   mobileThreadRefreshLoading: boolean;
-  centerMode: "chat" | "diff";
+  centerMode: "chat" | "diff" | "file";
   gitDiffViewStyle: "split" | "unified";
   setGitDiffViewStyle: (style: "split" | "unified") => void;
   isCompact: boolean;

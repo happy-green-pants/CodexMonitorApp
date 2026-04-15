@@ -2,12 +2,12 @@
 
 ## Active Changelog
 
-- Current: `/.dev_logs/changelog_v13.md`
+- Current: `/.dev_logs/changelog_v14.md`
 
 ## Current Task
 
-- 远程线程流断开提示收敛为右上角连接状态标签
-- Goal: 移除远程流断开后的 toast、消息区恢复横幅与轮询倒计时，仅保留右上角 `Live`/`Polling`/`Disconnected` 标签表达连接状态，同时保持自动降级与恢复链路不变。
+- 本地打包 Linux x86_64 服务后端
+- Goal: 基于当前工作树生成 `codex_monitor_daemon` 的本地 release 二进制，并验证产物可执行。
 
 ## Notes
 
@@ -19,3 +19,4 @@
 - `changelog_v5.md` exceeded 100 lines; start `changelog_v6.md` for image picker runtime compatibility work.
 - `changelog_v11.md` approached the 100-line limit; start `changelog_v12.md` for daemon Linux release workflow fixes.
 - `changelog_v12.md` 已承载上一轮发版与远程 MCP 修复记录；当前 Android 远程恢复任务跨越前端、后端、RPC 与测试多模块，切换到 `changelog_v13.md` 继续记录。
+- `changelog_v13.md` 已接近 100 行且已混合多轮发布/远程恢复/文档任务；本轮 Web 文件编辑扩展切换到 `changelog_v14.md`，避免功能记忆串扰。

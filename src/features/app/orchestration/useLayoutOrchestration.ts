@@ -10,7 +10,7 @@ type UseAppShellOrchestrationOptions = {
   rightPanelCollapsed: boolean;
   shouldReduceTransparency: boolean;
   isWorkspaceDropActive: boolean;
-  centerMode: "chat" | "diff";
+  centerMode: "chat" | "diff" | "file";
   selectedDiffPath: string | null;
   showComposer: boolean;
   activeThreadId: string | null;
@@ -44,7 +44,9 @@ export function useAppShellOrchestration({
   appSettings,
 }: UseAppShellOrchestrationOptions) {
   const isWindows = isWindowsPlatform();
-  const showGitDetail = Boolean(selectedDiffPath) && isPhone && centerMode === "diff";
+  const showGitDetail =
+    isPhone &&
+    ((centerMode === "diff" && Boolean(selectedDiffPath)) || centerMode === "file");
   const isThreadOpen = Boolean(activeThreadId && showComposer);
 
   const appClassName = `app ${isCompact ? "layout-compact" : "layout-desktop"}${

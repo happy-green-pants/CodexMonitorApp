@@ -5,7 +5,7 @@ import type { PerFileDiffGroup } from "../../git/utils/perFileThreadDiffs";
 
 type Params = {
   diffSource: GitDiffSource;
-  centerMode: "chat" | "diff";
+  centerMode: "chat" | "diff" | "file";
   gitPullRequestDiffs: GitHubPullRequestDiff[];
   gitCommitDiffs: GitCommitDiff[];
   perFileDiffGroups: PerFileDiffGroup[];

@@ -468,3 +468,18 @@ where
     let root = resolve_workspace_root(workspaces, workspace_id).await?;
     read_file(&root, path)
 }
+
+pub(crate) async fn write_workspace_file_core<F, T>(
+    workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
+    workspace_id: &str,
+    path: &str,
+    content: &str,
+    expected_revision: Option<&str>,
+    write_file: F,
+) -> Result<T, String>
+where
+    F: Fn(&PathBuf, &str, &str, Option<&str>) -> Result<T, String>,
+{
+    let root = resolve_workspace_root(workspaces, workspace_id).await?;
+    write_file(&root, path, content, expected_revision)
+}

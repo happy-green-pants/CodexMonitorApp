@@ -1,7 +1,7 @@
 import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
 import { MainTopbar } from "../../app/components/MainTopbar";
 
-type CenterMode = "chat" | "diff";
+type CenterMode = "chat" | "diff" | "file";
 
 function shouldRenderDiffViewer({
   splitChatDiffView,
@@ -12,7 +12,7 @@ function shouldRenderDiffViewer({
   preloadGitDiffs: boolean;
   centerMode: CenterMode;
 }) {
-  return splitChatDiffView || preloadGitDiffs || centerMode === "diff";
+  return splitChatDiffView || preloadGitDiffs || centerMode !== "chat";
 }
 
 function isActiveLayer(centerMode: CenterMode, layer: CenterMode) {
@@ -63,11 +63,11 @@ type DesktopLayoutProps = {
   showWorkspace: boolean;
   topbarLeftNode: ReactNode;
   topbarActionsNode?: ReactNode;
-  centerMode: "chat" | "diff";
+  centerMode: "chat" | "diff" | "file";
   preloadGitDiffs: boolean;
   splitChatDiffView: boolean;
   messagesNode: ReactNode;
-  gitDiffViewerNode: ReactNode;
+  centerDetailNode: ReactNode;
   gitDiffPanelNode: ReactNode;
   planPanelNode: ReactNode;
   composerNode: ReactNode;
@@ -94,7 +94,7 @@ export function DesktopLayout({
   preloadGitDiffs,
   splitChatDiffView,
   messagesNode,
-  gitDiffViewerNode,
+  centerDetailNode,
   gitDiffPanelNode,
   planPanelNode,
   composerNode,
@@ -106,27 +106,27 @@ export function DesktopLayout({
   onPlanPanelResizeStart,
   onChatDiffSplitPositionResizeStart,
 }: DesktopLayoutProps) {
-  const diffLayerRef = useRef<HTMLDivElement | null>(null);
+  const detailLayerRef = useRef<HTMLDivElement | null>(null);
   const chatLayerRef = useRef<HTMLDivElement | null>(null);
-  const diffLayerActive = isActiveLayer(centerMode, "diff");
+  const detailLayerActive = centerMode !== "chat";
   const chatLayerActive = isActiveLayer(centerMode, "chat");
-  const showDiffViewer = shouldRenderDiffViewer({
+  const showDetailViewer = shouldRenderDiffViewer({
     splitChatDiffView,
     preloadGitDiffs,
     centerMode,
   });
 
   useEffect(() => {
-    const diffLayer = diffLayerRef.current;
+    const detailLayer = detailLayerRef.current;
     const chatLayer = chatLayerRef.current;
-    setLayerInert(diffLayer, diffLayerActive, splitChatDiffView);
+    setLayerInert(detailLayer, detailLayerActive, splitChatDiffView);
     setLayerInert(chatLayer, chatLayerActive, splitChatDiffView);
 
     if (splitChatDiffView) {
       return;
     }
 
-    const hiddenLayer = diffLayerActive ? chatLayer : diffLayer;
+    const hiddenLayer = detailLayerActive ? chatLayer : detailLayer;
     const activeElement = document.activeElement;
     if (
       hiddenLayer &&
@@ -135,7 +135,7 @@ export function DesktopLayout({
     ) {
       activeElement.blur();
     }
-  }, [chatLayerActive, diffLayerActive, splitChatDiffView]);
+  }, [chatLayerActive, detailLayerActive, splitChatDiffView]);
 
   return (
     <>
@@ -181,11 +181,11 @@ export function DesktopLayout({
                     className={layerClassName({
                       splitChatDiffView,
                       layer: "diff",
-                      isActive: diffLayerActive,
+                      isActive: detailLayerActive,
                     })}
-                    ref={diffLayerRef}
+                    ref={detailLayerRef}
                   >
-                    {showDiffViewer ? gitDiffViewerNode : null}
+                    {showDetailViewer ? centerDetailNode : null}
                   </div>
                 </>
               ) : (
@@ -194,12 +194,12 @@ export function DesktopLayout({
                     className={layerClassName({
                       splitChatDiffView,
                       layer: "diff",
-                      isActive: diffLayerActive,
+                      isActive: detailLayerActive,
                     })}
-                    aria-hidden={!splitChatDiffView ? !diffLayerActive : undefined}
-                    ref={diffLayerRef}
+                    aria-hidden={!splitChatDiffView ? !detailLayerActive : undefined}
+                    ref={detailLayerRef}
                   >
-                    {showDiffViewer ? gitDiffViewerNode : null}
+                    {showDetailViewer ? centerDetailNode : null}
                   </div>
                   <div
                     className={layerClassName({

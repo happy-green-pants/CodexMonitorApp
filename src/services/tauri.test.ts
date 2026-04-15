@@ -33,6 +33,7 @@ import {
   listWorkspaces,
   openWorkspaceIn,
   readAgentMd,
+  readWorkspaceFile,
   stageGitAll,
   respondToServerRequest,
   respondToUserInputRequest,
@@ -64,6 +65,7 @@ import {
   generateAgentDescription,
   writeAgentConfigToml,
   writeAgentMd,
+  writeWorkspaceFile,
 } from "./tauri";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -777,6 +779,38 @@ describe("tauri invoke wrappers", () => {
     });
   });
 
+  it("reads a workspace file with revision metadata", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({
+      content: "export const ready = true;\n",
+      truncated: false,
+      revision: "sha256:abc123",
+    });
+
+    await readWorkspaceFile("ws-1", "src/example.ts");
+
+    expect(invokeMock).toHaveBeenCalledWith("read_workspace_file", {
+      workspaceId: "ws-1",
+      path: "src/example.ts",
+    });
+  });
+
+  it("writes a workspace file with optimistic revision checking", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({
+      revision: "sha256:def456",
+    });
+
+    await writeWorkspaceFile("ws-1", "src/example.ts", "next", "sha256:abc123");
+
+    expect(invokeMock).toHaveBeenCalledWith("write_workspace_file", {
+      workspaceId: "ws-1",
+      path: "src/example.ts",
+      content: "next",
+      expectedRevision: "sha256:abc123",
+    });
+  });
+
   it("reads agents settings", async () => {
     const invokeMock = vi.mocked(invoke);
     invokeMock.mockResolvedValueOnce({
@@ -919,6 +953,8 @@ describe("tauri invoke wrappers", () => {
 
   it("fills sendUserMessage defaults in payload", async () => {
     const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({ backendMode: "local" });
+    invokeMock.mockResolvedValueOnce(false);
     invokeMock.mockResolvedValueOnce({});
 
     await sendUserMessage("ws-4", "thread-1", "hello", {

@@ -3,6 +3,9 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex as StdMutex};
 
+use super::files::{
+    list_workspace_files_inner, read_workspace_file_inner, write_workspace_file_inner,
+};
 use super::settings::{apply_workspace_settings_update, sort_workspaces};
 use super::worktree::{
     build_clone_destination_path, sanitize_clone_dir_name, sanitize_worktree_name,
@@ -254,6 +257,62 @@ fn update_workspace_settings_persists_sort_and_group() {
         stored.settings.worktree_setup_script.as_deref(),
         Some("pnpm install"),
     );
+}
+
+#[test]
+fn read_workspace_file_returns_revision_metadata() {
+    let temp_dir = std::env::temp_dir().join(format!("codex-monitor-test-{}", Uuid::new_v4()));
+    std::fs::create_dir_all(&temp_dir).expect("create temp dir");
+    let file_path = temp_dir.join("src").join("example.ts");
+    std::fs::create_dir_all(file_path.parent().expect("parent")).expect("create parent");
+    std::fs::write(&file_path, "export const ready = true;\n").expect("write file");
+
+    let response = read_workspace_file_inner(&temp_dir, "src/example.ts").expect("read file");
+
+    assert_eq!(response.content, "export const ready = true;\n");
+    assert!(!response.truncated);
+    assert!(!response.revision.trim().is_empty());
+  }
+
+#[test]
+fn write_workspace_file_rejects_revision_conflicts() {
+    let temp_dir = std::env::temp_dir().join(format!("codex-monitor-test-{}", Uuid::new_v4()));
+    std::fs::create_dir_all(&temp_dir).expect("create temp dir");
+    let file_path = temp_dir.join("src").join("example.ts");
+    std::fs::create_dir_all(file_path.parent().expect("parent")).expect("create parent");
+    std::fs::write(&file_path, "export const ready = true;\n").expect("write file");
+
+    let initial = read_workspace_file_inner(&temp_dir, "src/example.ts").expect("read file");
+    std::fs::write(&file_path, "export const ready = false;\n").expect("overwrite file");
+
+    let error = write_workspace_file_inner(
+        &temp_dir,
+        "src/example.ts",
+        "export const ready = \"conflict\";\n",
+        Some(initial.revision.as_str()),
+    )
+    .expect_err("conflict expected");
+
+    assert!(error.contains("conflict"));
+}
+
+#[test]
+fn list_workspace_files_keeps_common_hidden_config_files_visible() {
+    let temp_dir = std::env::temp_dir().join(format!("codex-monitor-test-{}", Uuid::new_v4()));
+    std::fs::create_dir_all(&temp_dir).expect("create temp dir");
+    std::fs::write(temp_dir.join(".env"), "TOKEN=1\n").expect("write env");
+    std::fs::create_dir_all(temp_dir.join(".github")).expect("create .github");
+    std::fs::write(temp_dir.join(".github").join("workflow.yml"), "name: ci\n")
+        .expect("write workflow");
+    std::fs::create_dir_all(temp_dir.join("node_modules")).expect("create node_modules");
+    std::fs::write(temp_dir.join("node_modules").join("ignored.js"), "export {}\n")
+        .expect("write ignored file");
+
+    let files = list_workspace_files_inner(&temp_dir, usize::MAX);
+
+    assert!(files.iter().any(|path| path == ".env"));
+    assert!(files.iter().any(|path| path == ".github/workflow.yml"));
+    assert!(!files.iter().any(|path| path.contains("node_modules")));
 }
 
 #[test]

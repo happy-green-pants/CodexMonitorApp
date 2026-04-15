@@ -36,7 +36,6 @@ const workspace: WorkspaceInfo = {
 function makeProps(overrides?: Partial<Parameters<typeof useGitPanelController>[0]>) {
   return {
     activeWorkspace: workspace,
-    backendMode: "local" as const,
     activeItems: [],
     gitDiffPreloadEnabled: false,
     gitDiffIgnoreWhitespaceChanges: false,
@@ -199,7 +198,6 @@ describe("useGitPanelController preload behavior", () => {
     const { result } = renderHook(() =>
       useGitPanelController(
         makeProps({
-          backendMode: "remote",
           gitDiffPreloadEnabled: true,
         }),
       ),
@@ -287,5 +285,16 @@ describe("useGitPanelController preload behavior", () => {
     expect(result.current.selectedDiffPath).toBe(
       "src/main.ts@@item-change-1@@change-0",
     );
+  });
+
+  it("switches to file editor mode when opening a workspace file", () => {
+    const { result } = renderHook(() => useGitPanelController(makeProps()));
+
+    act(() => {
+      result.current.openWorkspaceFile("src/example.ts");
+    });
+
+    expect(result.current.centerMode).toBe("file");
+    expect(result.current.activeWorkspaceFilePath).toBe("src/example.ts");
   });
 });

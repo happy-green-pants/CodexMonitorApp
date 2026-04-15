@@ -17,7 +17,7 @@ type TabletLayoutProps = {
   messagesNode: ReactNode;
   composerNode: ReactNode;
   gitDiffPanelNode: ReactNode;
-  gitDiffViewerNode: ReactNode;
+  centerDetailNode: ReactNode;
   debugPanelNode: ReactNode;
 };
 
@@ -37,7 +37,7 @@ export function TabletLayout({
   messagesNode,
   composerNode,
   gitDiffPanelNode,
-  gitDiffViewerNode,
+  centerDetailNode,
   debugPanelNode,
 }: TabletLayoutProps) {
   return (
@@ -72,7 +72,7 @@ export function TabletLayout({
             {tabletTab === "git" && (
               <div className="tablet-git">
                 {gitDiffPanelNode}
-                <div className="tablet-git-viewer">{gitDiffViewerNode}</div>
+                <div className="tablet-git-viewer">{centerDetailNode}</div>
               </div>
             )}
             {tabletTab === "log" && debugPanelNode}

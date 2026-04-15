@@ -22,6 +22,7 @@ import "./styles/review-inline.css";
 import "./styles/diff.css";
 import "./styles/diff-viewer.css";
 import "./styles/file-tree.css";
+import "./styles/workspace-file-editor.css";
 import "./styles/panel-tabs.css";
 import "./styles/prompts.css";
 import "./styles/debug.css";

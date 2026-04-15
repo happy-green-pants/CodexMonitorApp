@@ -1104,10 +1104,24 @@ export async function getWorkspaceFiles(workspaceId: string) {
 export async function readWorkspaceFile(
   workspaceId: string,
   path: string,
-): Promise<{ content: string; truncated: boolean }> {
-  return invoke<{ content: string; truncated: boolean }>("read_workspace_file", {
+): Promise<{ content: string; truncated: boolean; revision: string }> {
+  return invoke<{ content: string; truncated: boolean; revision: string }>("read_workspace_file", {
     workspaceId,
     path,
+  });
+}
+
+export async function writeWorkspaceFile(
+  workspaceId: string,
+  path: string,
+  content: string,
+  expectedRevision: string | null,
+): Promise<{ revision: string }> {
+  return invoke<{ revision: string }>("write_workspace_file", {
+    workspaceId,
+    path,
+    content,
+    expectedRevision,
   });
 }
 

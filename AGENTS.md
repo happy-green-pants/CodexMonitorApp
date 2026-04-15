@@ -21,6 +21,14 @@ CodexMonitor is a Tauri app that orchestrates Codex agents across local workspac
 - Backend daemon: JSON-RPC process (`src-tauri/src/bin/codex_monitor_daemon.rs`)
 - Shared backend source of truth: `src-tauri/src/shared/*`
 
+## Project-Specific Execution Constraints
+
+- Treat local disk space as constrained. Do not use heavy build, bundle, packaging, or release commands as routine verification for this repo.
+- Do not default to `npm run tauri:build`, `npm run tauri:build:win`, Android local packaging, or `cargo build --release` when validating changes.
+- Prefer lightweight validation that does not generate large release artifacts. Use the smallest command set that proves the touched behavior.
+- If a user asks to package, publish, or produce installable artifacts for Android, Windows, or daemon binaries, default to the GitHub workflow/release path in `docs/build/github-release-runbook.md`.
+- If `README.md` or older notes show local release commands, treat them as reference-only examples unless the user explicitly requests that local path.
+
 ## Non-Negotiable Architecture Rules
 
 1. Put shared/domain backend logic in `src-tauri/src/shared/*` first.
@@ -126,6 +134,7 @@ Run validations based on touched areas:
 - Frontend behavior/state/hooks/components: `npm run test`
 - Rust backend changes: `cd src-tauri && cargo check`
 - Use targeted tests for touched modules before full-suite runs when iterating.
+- Do not use local release builds or bundle generation as default verification because this workspace can run out of disk space.
 
 ## Quick Runbook
 
@@ -140,33 +149,17 @@ npm run typecheck
 cd src-tauri && cargo check
 ```
 
-Release build:
+Local release/build policy:
 
-```bash
-npm run tauri:build
-```
+- Do not run local packaging or release build commands by default in this repo.
+- Keep local verification to lightweight checks unless the user explicitly accepts a heavier path.
 
 GitHub release packaging default:
 
 - When the user says "打包到 GitHub" or asks to publish to GitHub Release, follow `docs/build/github-release-runbook.md`.
 - Default deliverables are the Android APK plus daemon binaries uploaded to the existing/new GitHub Release.
+- Android APK, Windows installers/bundles, and daemon release binaries should all prefer GitHub Actions / GitHub Release workflows over local artifact builds.
 - Do not assume desktop app bundles are required unless the user explicitly asks for them.
-
-Backend daemon release build (main workspace only):
-
-```bash
-# 必须在主工作区 /www/wwwroot/CodexMonitor 执行
-cargo build --release --bin codex_monitor_daemon --manifest-path src-tauri/Cargo.toml
-
-# 产物路径
-ls -l src-tauri/target/release/codex_monitor_daemon
-
-# 最小可执行性验证
-src-tauri/target/release/codex_monitor_daemon --help
-
-# 需要前台启动时使用脚本
-bash scripts/start_codex_monitor_daemon.sh
-```
 
 Focused test runs:
 

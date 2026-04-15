@@ -23,6 +23,15 @@ pub(crate) struct ReadWorkspaceFileRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct WriteWorkspaceFileRequest {
+    pub(crate) workspace_id: String,
+    pub(crate) path: String,
+    pub(crate) content: String,
+    pub(crate) expected_revision: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct SetWorkspaceRuntimeCodexArgsRequest {
     pub(crate) workspace_id: String,
     pub(crate) codex_args: Option<String>,

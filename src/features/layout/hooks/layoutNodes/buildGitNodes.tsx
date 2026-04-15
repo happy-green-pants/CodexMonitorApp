@@ -1,4 +1,5 @@
 import { FileTreePanel } from "../../../files/components/FileTreePanel";
+import { WorkspaceFileEditor } from "../../../files/components/WorkspaceFileEditor";
 import { GitDiffPanel } from "../../../git/components/GitDiffPanel";
 import { GitDiffViewer } from "../../../git/components/GitDiffViewer";
 import { PromptPanel } from "../../../prompts/components/PromptPanel";
@@ -9,7 +10,7 @@ import type {
 
 export type GitLayoutNodesOptions = LayoutGitSurface;
 
-type GitLayoutNodes = Pick<LayoutNodesResult, "gitDiffPanelNode" | "gitDiffViewerNode">;
+type GitLayoutNodes = Pick<LayoutNodesResult, "gitDiffPanelNode" | "centerDetailNode">;
 
 function resolveGitDiffStyle({
   isPhone,
@@ -47,20 +48,24 @@ export function buildGitNodes(options: GitLayoutNodesOptions): GitLayoutNodes {
     );
   }
 
-  const gitDiffViewerNode = (
-    <GitDiffViewer
-      {...options.gitDiffViewerProps}
-      diffStyle={resolveGitDiffStyle({
-        isPhone: options.diffViewProps.isPhone,
-        splitChatDiffView: options.diffViewProps.splitChatDiffView,
-        centerMode: options.diffViewProps.centerMode,
-        userPreference: options.diffViewProps.gitDiffViewStyle,
-      })}
-    />
+  const centerDetailNode = (
+    options.diffViewProps.centerMode === "file" && options.workspaceFileEditorProps ? (
+      <WorkspaceFileEditor {...options.workspaceFileEditorProps} />
+    ) : (
+      <GitDiffViewer
+        {...options.gitDiffViewerProps}
+        diffStyle={resolveGitDiffStyle({
+          isPhone: options.diffViewProps.isPhone,
+          splitChatDiffView: options.diffViewProps.splitChatDiffView,
+          centerMode: options.diffViewProps.centerMode,
+          userPreference: options.diffViewProps.gitDiffViewStyle,
+        })}
+      />
+    )
   );
 
   return {
     gitDiffPanelNode,
-    gitDiffViewerNode,
+    centerDetailNode,
   };
 }

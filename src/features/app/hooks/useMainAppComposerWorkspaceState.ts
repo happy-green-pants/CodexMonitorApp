@@ -21,7 +21,7 @@ const RECENT_THREAD_LIMIT = 8;
 
 type UseMainAppComposerWorkspaceStateArgs = {
   view: {
-    centerMode: "chat" | "diff";
+    centerMode: "chat" | "diff" | "file";
     isCompact: boolean;
     isTablet: boolean;
     activeTab: "home" | "projects" | "codex" | "git" | "log";
@@ -159,7 +159,7 @@ export function useMainAppComposerWorkspaceState({
   );
   const showComposer =
     (!isCompact
-      ? centerMode === "chat" || centerMode === "diff"
+      ? centerMode === "chat" || centerMode === "diff" || centerMode === "file"
       : (isTablet ? tabletTab : activeTab) === "codex") && !showWorkspaceHome;
 
   const { files, isLoading: isFilesLoading, setFileAutocompleteActive } =

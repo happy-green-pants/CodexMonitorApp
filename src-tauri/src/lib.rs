@@ -260,6 +260,7 @@ pub fn run() {
             git::checkout_github_pull_request,
             workspaces::list_workspace_files,
             workspaces::read_workspace_file,
+            workspaces::write_workspace_file,
             workspaces::open_workspace_in,
             workspaces::get_open_app_icon,
             git::list_git_branches,

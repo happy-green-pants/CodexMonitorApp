@@ -48,6 +48,7 @@ type FileTreePanelProps = {
   openAppIconById: Record<string, string>;
   selectedOpenAppId: string;
   onSelectOpenAppId: (id: string) => void;
+  onOpenFile?: (path: string) => void;
 };
 
 type FileTreeBuildNode = {
@@ -192,6 +193,7 @@ export function FileTreePanel({
   openAppIconById,
   selectedOpenAppId,
   onSelectOpenAppId,
+  onOpenFile,
 }: FileTreePanelProps) {
   const [filterMode, setFilterMode] = useState<"all" | "modified">("all");
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -675,6 +677,10 @@ export function FileTreePanel({
           onClick={(event) => {
             if (isFolder) {
               toggleFolder(node.path);
+              return;
+            }
+            if (onOpenFile && !isImagePath(node.path)) {
+              onOpenFile(node.path);
               return;
             }
             openPreview(node.path, event.currentTarget);

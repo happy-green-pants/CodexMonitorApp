@@ -81,3 +81,9 @@ State Summary (from `changelog_v12.md`):
 - **Why**: 用户要求流断开时不再弹提示，也不再通过消息区额外提示表达轮询/恢复状态，只通过右上角 `Polling` 标签判断即可。
 - **Goal**: 让远程流从 `live` 静默降级为 `polling` 或 `disconnected` 时不打断使用体验，同时保留原有自动刷新、自动重连和手动刷新能力。
 ---
+### [2026-04-15 20:31] | Agent: Codex (GPT-5)
+- **File**: `/AGENTS.md`, `/.dev_logs/manifest.md`, `/.dev_logs/changelog_v13.md`
+- **Change**: 为仓库根 `AGENTS.md` 增补项目特定执行约束，明确本地磁盘受限时禁止将 `tauri:build`、`cargo build --release`、Android 本地打包等作为默认验证手段；同步把 Android、Windows 与 daemon 产物统一收敛到 GitHub Release runbook；更新 manifest 当前任务说明并记录本次文档变更。
+- **Why**: 用户要求针对当前项目补充约束，避免本地构建产物挤满磁盘，同时让桌面端、移动端与 daemon 的发行路径统一走线上流程。
+- **Goal**: 让后续执行者在阅读 `AGENTS.md` 时直接采用轻量验证和 GitHub 线上发版策略，减少误操作和环境风险。
+---

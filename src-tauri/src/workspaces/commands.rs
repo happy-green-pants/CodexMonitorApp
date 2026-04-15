@@ -4,7 +4,10 @@ use std::sync::Arc;
 
 use tauri::{AppHandle, Manager, State};
 
-use super::files::{list_workspace_files_inner, read_workspace_file_inner, WorkspaceFileResponse};
+use super::files::{
+    list_workspace_files_inner, read_workspace_file_inner, write_workspace_file_inner,
+    WorkspaceFileResponse, WorkspaceFileWriteResponse,
+};
 use super::git::{
     git_branch_exists, git_find_remote_for_branch, git_remote_branch_exists, git_remote_exists,
     is_missing_worktree_error, run_git_command_owned, unique_branch_name,
@@ -66,6 +69,45 @@ pub(crate) async fn read_workspace_file(
         &workspace_id,
         &path,
         |root, rel_path| read_workspace_file_inner(root, rel_path),
+    )
+    .await
+}
+
+#[tauri::command]
+pub(crate) async fn write_workspace_file(
+    workspace_id: String,
+    path: String,
+    content: String,
+    expected_revision: Option<String>,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<WorkspaceFileWriteResponse, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        let request = workspace_rpc::WriteWorkspaceFileRequest {
+            workspace_id,
+            path,
+            content,
+            expected_revision,
+        };
+        let response = remote_backend::call_remote(
+            &*state,
+            app,
+            "write_workspace_file",
+            workspace_remote_params(&request)?,
+        )
+        .await?;
+        return serde_json::from_value(response).map_err(|err| err.to_string());
+    }
+
+    workspaces_core::write_workspace_file_core(
+        &state.workspaces,
+        &workspace_id,
+        &path,
+        &content,
+        expected_revision.as_deref(),
+        |root, rel_path, next_content, expected| {
+            write_workspace_file_inner(root, rel_path, next_content, expected)
+        },
     )
     .await
 }

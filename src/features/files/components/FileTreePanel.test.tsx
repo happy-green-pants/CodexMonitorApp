@@ -72,6 +72,7 @@ const baseProps = {
   openAppIconById: {},
   selectedOpenAppId: "",
   onSelectOpenAppId: vi.fn(),
+  onOpenFile: vi.fn(),
 };
 
 function mockNarrowMatchMedia() {
@@ -117,9 +118,15 @@ describe("FileTreePanel", () => {
     vi.mocked(readWorkspaceFile).mockResolvedValue({
       content: "alpha\nbeta",
       truncated: false,
+      revision: "sha256:preview",
     });
 
-    render(<FileTreePanel {...baseProps} />);
+    render(
+      <FileTreePanel
+        {...baseProps}
+        onOpenFile={undefined}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "example.ts" }));
 
@@ -162,5 +169,15 @@ describe("FileTreePanel", () => {
     expect(readWorkspaceFile).not.toHaveBeenCalled();
     expect(convertFileSrc).toHaveBeenCalledWith("/workspace/assets/photo.png");
     expect(screen.getByRole("img", { name: "assets/photo.png" })).toBeTruthy();
+  });
+
+  it("opens text files in the editor surface when an editor handler is provided", async () => {
+    render(<FileTreePanel {...baseProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "example.ts" }));
+
+    expect(baseProps.onOpenFile).toHaveBeenCalledWith("src/example.ts");
+    expect(readWorkspaceFile).not.toHaveBeenCalled();
+    expect(document.querySelector(".file-preview-popover")).toBeNull();
   });
 });

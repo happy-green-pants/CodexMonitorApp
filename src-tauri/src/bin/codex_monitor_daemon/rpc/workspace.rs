@@ -200,6 +200,18 @@ pub(super) async fn try_handle(
                     .await,
             )
         }
+        "write_workspace_file" => {
+            let request = parse_request_or_err!(params, workspace_rpc::WriteWorkspaceFileRequest);
+            Some(
+                serialize_result(state.write_workspace_file(
+                    request.workspace_id,
+                    request.path,
+                    request.content,
+                    request.expected_revision,
+                ))
+                .await,
+            )
+        }
         "add_clone" => {
             let request = parse_request_or_err!(params, workspace_rpc::AddCloneRequest);
             Some(
