@@ -277,6 +277,64 @@ pub(crate) async fn list_mcp_server_status_core(
         .await
 }
 
+pub(crate) async fn mcp_server_tool_call_core(
+    sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
+    workspace_id: String,
+    thread_id: String,
+    server: String,
+    tool: String,
+    arguments: Option<Value>,
+    meta: Option<Value>,
+) -> Result<Value, String> {
+    let session = get_session_clone(sessions, &workspace_id).await?;
+    let mut params = Map::new();
+    params.insert("threadId".to_string(), json!(thread_id));
+    params.insert("server".to_string(), json!(server));
+    params.insert("tool".to_string(), json!(tool));
+    if let Some(arguments) = arguments {
+        params.insert("arguments".to_string(), arguments);
+    }
+    if let Some(meta) = meta {
+        params.insert("_meta".to_string(), meta);
+    }
+    session
+        .send_request_for_workspace(&workspace_id, "mcpServer/tool/call", Value::Object(params))
+        .await
+}
+
+pub(crate) async fn mcp_server_resource_read_core(
+    sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
+    workspace_id: String,
+    thread_id: Option<String>,
+    server: String,
+    uri: String,
+) -> Result<Value, String> {
+    let session = get_session_clone(sessions, &workspace_id).await?;
+    let mut params = Map::new();
+    params.insert("server".to_string(), json!(server));
+    params.insert("uri".to_string(), json!(uri));
+    if let Some(thread_id) = thread_id {
+        params.insert("threadId".to_string(), json!(thread_id));
+    }
+    session
+        .send_request_for_workspace(
+            &workspace_id,
+            "mcpServer/resource/read",
+            Value::Object(params),
+        )
+        .await
+}
+
+pub(crate) async fn reload_mcp_servers_core(
+    sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
+    workspace_id: String,
+) -> Result<Value, String> {
+    let session = get_session_clone(sessions, &workspace_id).await?;
+    session
+        .send_request_for_workspace(&workspace_id, "config/mcpServer/reload", json!({}))
+        .await
+}
+
 pub(crate) async fn archive_thread_core(
     sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
     workspace_id: String,
@@ -975,5 +1033,42 @@ mod tests {
         assert!(THREAD_LIST_SOURCE_KINDS.contains(&"subAgentReview"));
         assert!(THREAD_LIST_SOURCE_KINDS.contains(&"subAgentCompact"));
         assert!(THREAD_LIST_SOURCE_KINDS.contains(&"subAgentThreadSpawn"));
+    }
+
+    #[test]
+    fn mcp_server_tool_call_payload_uses_expected_wire_keys() {
+        let mut params = Map::new();
+        params.insert("threadId".to_string(), json!("thread-1"));
+        params.insert("server".to_string(), json!("gemini"));
+        params.insert("tool".to_string(), json!("ping"));
+        params.insert("arguments".to_string(), json!({ "prompt": "mcp-ok" }));
+        params.insert("_meta".to_string(), json!({ "source": "codex-monitor" }));
+
+        let value = Value::Object(params);
+        assert_eq!(value.get("threadId"), Some(&json!("thread-1")));
+        assert_eq!(value.get("server"), Some(&json!("gemini")));
+        assert_eq!(value.get("tool"), Some(&json!("ping")));
+        assert_eq!(value.get("arguments"), Some(&json!({ "prompt": "mcp-ok" })));
+        assert_eq!(value.get("_meta"), Some(&json!({ "source": "codex-monitor" })));
+    }
+
+    #[test]
+    fn mcp_server_resource_read_payload_keeps_thread_optional() {
+        let with_thread = json!({
+            "threadId": "thread-1",
+            "server": "gemini",
+            "uri": "resource://demo"
+        });
+        assert_eq!(with_thread.get("threadId"), Some(&json!("thread-1")));
+        assert_eq!(with_thread.get("server"), Some(&json!("gemini")));
+        assert_eq!(with_thread.get("uri"), Some(&json!("resource://demo")));
+
+        let without_thread = json!({
+            "server": "gemini",
+            "uri": "resource://demo"
+        });
+        assert_eq!(without_thread.get("threadId"), None);
+        assert_eq!(without_thread.get("server"), Some(&json!("gemini")));
+        assert_eq!(without_thread.get("uri"), Some(&json!("resource://demo")));
     }
 }

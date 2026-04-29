@@ -255,6 +255,99 @@ pub(crate) async fn list_mcp_server_status(
 }
 
 #[tauri::command]
+pub(crate) async fn mcp_server_tool_call(
+    workspace_id: String,
+    thread_id: String,
+    server: String,
+    tool: String,
+    arguments: Option<Value>,
+    meta: Option<Value>,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Value, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        return remote_backend::call_remote(
+            &*state,
+            app,
+            "mcp_server_tool_call",
+            json!({
+                "workspaceId": workspace_id,
+                "threadId": thread_id,
+                "server": server,
+                "tool": tool,
+                "arguments": arguments,
+                "meta": meta
+            }),
+        )
+        .await;
+    }
+
+    codex_core::mcp_server_tool_call_core(
+        &state.sessions,
+        workspace_id,
+        thread_id,
+        server,
+        tool,
+        arguments,
+        meta,
+    )
+    .await
+}
+
+#[tauri::command]
+pub(crate) async fn mcp_server_resource_read(
+    workspace_id: String,
+    thread_id: Option<String>,
+    server: String,
+    uri: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Value, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        return remote_backend::call_remote(
+            &*state,
+            app,
+            "mcp_server_resource_read",
+            json!({
+                "workspaceId": workspace_id,
+                "threadId": thread_id,
+                "server": server,
+                "uri": uri
+            }),
+        )
+        .await;
+    }
+
+    codex_core::mcp_server_resource_read_core(
+        &state.sessions,
+        workspace_id,
+        thread_id,
+        server,
+        uri,
+    )
+    .await
+}
+
+#[tauri::command]
+pub(crate) async fn reload_mcp_servers(
+    workspace_id: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Value, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        return remote_backend::call_remote(
+            &*state,
+            app,
+            "reload_mcp_servers",
+            json!({ "workspaceId": workspace_id }),
+        )
+        .await;
+    }
+
+    codex_core::reload_mcp_servers_core(&state.sessions, workspace_id).await
+}
+
+#[tauri::command]
 pub(crate) async fn archive_thread(
     workspace_id: String,
     thread_id: String,

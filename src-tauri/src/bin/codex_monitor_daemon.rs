@@ -456,6 +456,48 @@ impl DaemonState {
         codex_core::list_mcp_server_status_core(&self.sessions, workspace_id, cursor, limit).await
     }
 
+    async fn mcp_server_tool_call(
+        &self,
+        workspace_id: String,
+        thread_id: String,
+        server: String,
+        tool: String,
+        arguments: Option<Value>,
+        meta: Option<Value>,
+    ) -> Result<Value, String> {
+        codex_core::mcp_server_tool_call_core(
+            &self.sessions,
+            workspace_id,
+            thread_id,
+            server,
+            tool,
+            arguments,
+            meta,
+        )
+        .await
+    }
+
+    async fn mcp_server_resource_read(
+        &self,
+        workspace_id: String,
+        thread_id: Option<String>,
+        server: String,
+        uri: String,
+    ) -> Result<Value, String> {
+        codex_core::mcp_server_resource_read_core(
+            &self.sessions,
+            workspace_id,
+            thread_id,
+            server,
+            uri,
+        )
+        .await
+    }
+
+    async fn reload_mcp_servers(&self, workspace_id: String) -> Result<Value, String> {
+        codex_core::reload_mcp_servers_core(&self.sessions, workspace_id).await
+    }
+
     async fn archive_thread(
         &self,
         workspace_id: String,

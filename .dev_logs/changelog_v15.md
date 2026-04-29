@@ -90,3 +90,9 @@ State Summary (from `changelog_v14.md`):
 - **Change**: 为 app-server 会话增加 `mcpServer/startupStatus/updated` 跟踪与等待逻辑，并让 `start_thread_core()` 在 `thread/start` 成功后短暂等待 MCP 从 `starting` 收敛到 `ready/error`，避免新线程首个 turn 抢在 Gemini MCP 工具真正挂载完成之前发出。
 - **Why**: 正式 daemon 已能读到 Gemini 配置并枚举 `ping` 等工具，但真实 `start_thread -> send_user_message` 紧邻调用时仍会返回“当前会话未暴露 ping 工具”；最小对照进一步证实 `codex app-server` 在线程创建后会异步经历一次 Gemini `starting -> ready`，说明这里存在首轮 turn 与 MCP 启动完成之间的竞态。
 - **Goal**: 消除首轮会话的 MCP 暴露时序问题，让 CodexMonitor 新线程的第一次消息就能稳定调用 Gemini MCP。
+---
+### [2026-04-29 22:09] | Agent: Codex (GPT-5)
+- **File**: `/src-tauri/src/shared/codex_core.rs`, `/src-tauri/src/codex/mod.rs`, `/src-tauri/src/bin/codex_monitor_daemon.rs`, `/src-tauri/src/bin/codex_monitor_daemon/rpc/codex.rs`, `/src-tauri/src/lib.rs`, `/src/services/tauri.ts`, `/src/services/tauri.test.ts`
+- **Change**: 补齐 CodexMonitor 缺失的 MCP 正式调用链路：新增 `mcp_server_tool_call`、`mcp_server_resource_read`、`reload_mcp_servers` 三组 shared/app/daemon/frontend 转发接口，并补最小测试锁定 wire method 与参数名，准备改用 app-server 官方 `mcpServer/tool/call` 通路直接验证 `gemini ping`。
+- **Why**: 实测表明当前系统只能通过 `mcpServerStatus/list` 枚举 Gemini server/tool 状态，但普通 `turn/start` 内的模型工具面并不会自动暴露 `gemini ping`；根因更接近“管理面已通、显式调用面缺失”，不是权限问题。
+- **Goal**: 先把 MCP 的显式工具调用能力打通，避免继续依赖普通对话回合里的自动工具暴露，从而为 Gemini MCP 可用性提供可控、可验证的协议级闭环。

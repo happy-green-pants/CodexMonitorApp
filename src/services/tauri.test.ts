@@ -27,6 +27,9 @@ import {
   getOpenAppIcon,
   listThreads,
   listMcpServerStatus,
+  callMcpServerTool,
+  readMcpServerResource,
+  reloadMcpServers,
   readGlobalAgentsMd,
   readGlobalCodexConfigToml,
   listPendingServerRequests,
@@ -519,6 +522,54 @@ describe("tauri invoke wrappers", () => {
       workspaceId: "ws-10",
       cursor: "cursor-1",
       limit: 25,
+    });
+  });
+
+  it("maps MCP tool call payload for mcp_server_tool_call", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({});
+
+    await callMcpServerTool(
+      "ws-11",
+      "thread-11",
+      "gemini",
+      "ping",
+      { prompt: "mcp-ok" },
+      { source: "test" },
+    );
+
+    expect(invokeMock).toHaveBeenCalledWith("mcp_server_tool_call", {
+      workspaceId: "ws-11",
+      threadId: "thread-11",
+      server: "gemini",
+      tool: "ping",
+      arguments: { prompt: "mcp-ok" },
+      meta: { source: "test" },
+    });
+  });
+
+  it("maps MCP resource read payload for mcp_server_resource_read", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({});
+
+    await readMcpServerResource("ws-12", "gemini", "resource://demo", "thread-12");
+
+    expect(invokeMock).toHaveBeenCalledWith("mcp_server_resource_read", {
+      workspaceId: "ws-12",
+      threadId: "thread-12",
+      server: "gemini",
+      uri: "resource://demo",
+    });
+  });
+
+  it("maps workspaceId for reload_mcp_servers", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({});
+
+    await reloadMcpServers("ws-13");
+
+    expect(invokeMock).toHaveBeenCalledWith("reload_mcp_servers", {
+      workspaceId: "ws-13",
     });
   });
 

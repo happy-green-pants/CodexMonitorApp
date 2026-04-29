@@ -108,6 +108,58 @@ pub(super) async fn try_handle(
                     .await,
             )
         }
+        "mcp_server_tool_call" => {
+            let workspace_id = match parse_string(params, "workspaceId") {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            let thread_id = match parse_string(params, "threadId") {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            let server = match parse_string(params, "server") {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            let tool = match parse_string(params, "tool") {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            let arguments = parse_optional_value(params, "arguments");
+            let meta = parse_optional_value(params, "meta");
+            Some(
+                state
+                    .mcp_server_tool_call(workspace_id, thread_id, server, tool, arguments, meta)
+                    .await,
+            )
+        }
+        "mcp_server_resource_read" => {
+            let workspace_id = match parse_string(params, "workspaceId") {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            let thread_id = parse_optional_string(params, "threadId");
+            let server = match parse_string(params, "server") {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            let uri = match parse_string(params, "uri") {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            Some(
+                state
+                    .mcp_server_resource_read(workspace_id, thread_id, server, uri)
+                    .await,
+            )
+        }
+        "reload_mcp_servers" => {
+            let workspace_id = match parse_string(params, "workspaceId") {
+                Ok(value) => value,
+                Err(err) => return Some(Err(err)),
+            };
+            Some(state.reload_mcp_servers(workspace_id).await)
+        }
         "archive_thread" => {
             let workspace_id = match parse_string(params, "workspaceId") {
                 Ok(value) => value,

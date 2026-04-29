@@ -1253,6 +1253,42 @@ export async function listMcpServerStatus(
   return invoke<any>("list_mcp_server_status", { workspaceId, cursor, limit });
 }
 
+export async function callMcpServerTool(
+  workspaceId: string,
+  threadId: string,
+  server: string,
+  tool: string,
+  argumentsValue?: Record<string, unknown> | null,
+  meta?: Record<string, unknown> | null,
+) {
+  return invoke<any>("mcp_server_tool_call", {
+    workspaceId,
+    threadId,
+    server,
+    tool,
+    arguments: argumentsValue ?? null,
+    meta: meta ?? null,
+  });
+}
+
+export async function readMcpServerResource(
+  workspaceId: string,
+  server: string,
+  uri: string,
+  threadId?: string | null,
+) {
+  return invoke<any>("mcp_server_resource_read", {
+    workspaceId,
+    threadId: threadId ?? null,
+    server,
+    uri,
+  });
+}
+
+export async function reloadMcpServers(workspaceId: string) {
+  return invoke<any>("reload_mcp_servers", { workspaceId });
+}
+
 export async function resumeThread(workspaceId: string, threadId: string) {
   return invoke<any>("resume_thread", { workspaceId, threadId });
 }
