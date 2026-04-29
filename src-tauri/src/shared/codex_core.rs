@@ -185,9 +185,12 @@ pub(crate) async fn start_thread_core(
         "cwd": workspace_path,
         "approvalPolicy": "on-request"
     });
-    session
+    let result = session
         .send_request_for_workspace(&workspace_id, "thread/start", params)
-        .await
+        .await?;
+    // Give MCP startup a short window to settle before the first user turn.
+    session.wait_for_mcp_ready_after_thread_start().await;
+    Ok(result)
 }
 
 pub(crate) async fn resume_thread_core(

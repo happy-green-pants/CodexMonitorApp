@@ -9,8 +9,8 @@ use std::time::Duration;
 
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, Command};
-use tokio::sync::{mpsc, oneshot, Mutex};
-use tokio::time::timeout;
+use tokio::sync::{mpsc, oneshot, Mutex, Notify};
+use tokio::time::{timeout, Instant};
 
 use crate::backend::events::{AppServerEvent, EventSink};
 use crate::codex::args::parse_codex_args;
@@ -484,6 +484,8 @@ pub(crate) struct WorkspaceSession {
     pub(crate) owner_workspace_id: String,
     pub(crate) workspace_ids: Mutex<HashSet<String>>,
     pub(crate) workspace_roots: Mutex<HashMap<String, String>>,
+    pub(crate) mcp_startup_status: Mutex<HashMap<String, String>>,
+    pub(crate) mcp_startup_notify: Notify,
 }
 
 impl WorkspaceSession {
@@ -660,6 +662,46 @@ impl WorkspaceSession {
     pub(crate) async fn send_response(&self, id: Value, result: Value) -> Result<(), String> {
         self.write_message(json!({ "id": id, "result": result }))
             .await
+    }
+
+    pub(crate) async fn wait_for_mcp_ready_after_thread_start(&self) {
+        const MCP_READY_GRACE: Duration = Duration::from_millis(1500);
+        const MCP_READY_TIMEOUT: Duration = Duration::from_secs(8);
+
+        let start = Instant::now();
+        let mut saw_pending_startup = false;
+
+        loop {
+            let statuses = self.mcp_startup_status.lock().await.clone();
+            let has_starting = statuses.values().any(|status| status == "starting");
+            let has_terminal_status = statuses
+                .values()
+                .any(|status| status == "ready" || status == "error");
+
+            if has_starting {
+                saw_pending_startup = true;
+            }
+            if saw_pending_startup && !has_starting {
+                return;
+            }
+            if has_terminal_status && !has_starting {
+                return;
+            }
+
+            let elapsed = start.elapsed();
+            let limit = if saw_pending_startup {
+                MCP_READY_TIMEOUT
+            } else {
+                MCP_READY_GRACE
+            };
+            if elapsed >= limit {
+                return;
+            }
+
+            let remaining = limit - elapsed;
+            let notified = self.mcp_startup_notify.notified();
+            let _ = timeout(remaining, notified).await;
+        }
     }
 }
 
@@ -946,6 +988,8 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
             entry.id.clone(),
             normalize_root_path(&entry.path),
         )])),
+        mcp_startup_status: Mutex::new(HashMap::new()),
+        mcp_startup_notify: Notify::new(),
     });
 
     let session_clone = Arc::clone(&session);
@@ -976,6 +1020,31 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
             let has_method = value.get("method").is_some();
             let has_result_or_error = value.get("result").is_some() || value.get("error").is_some();
             let method_name = value.get("method").and_then(|method| method.as_str());
+
+            if method_name == Some("mcpServer/startupStatus/updated") {
+                let server_name = value
+                    .get("params")
+                    .and_then(|params| params.get("name"))
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                let status = value
+                    .get("params")
+                    .and_then(|params| params.get("status"))
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                if let (Some(server_name), Some(status)) = (server_name, status) {
+                    session_clone
+                        .mcp_startup_status
+                        .lock()
+                        .await
+                        .insert(server_name, status);
+                    session_clone.mcp_startup_notify.notify_waiters();
+                }
+            }
 
             // Check if this event is for a background thread
             let thread_id = extract_thread_id(&value);

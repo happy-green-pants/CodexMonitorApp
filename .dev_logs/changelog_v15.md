@@ -84,3 +84,9 @@ State Summary (from `changelog_v14.md`):
 - **Change**: 在 Linux daemon workflow 中新增 `Reset Linux host build cache` 步骤，在执行 `cargo build` 前删除 `src-tauri/target/release` 与当前 target 的 `release/build` 目录，强制重建 host 侧 build-script。
 - **Why**: 失败日志表明 `rust-cache` 还原的 `whisper-rs-sys` build-script 仍然链接到了更高版本的 glibc，迁移到 `ubuntu-22.04` 后一启动就因为 `GLIBC_2.39` 缺失而崩溃；仅更换 runner 不足以消除这类跨镜像缓存污染。
 - **Goal**: 让 Linux daemon 在较低 glibc 基线 runner 上从干净的 host 构建脚本重新编译，避免缓存产物继续把旧 ABI 问题带回流程中。
+---
+### [2026-04-29 20:45] | Agent: Codex (GPT-5)
+- **File**: `/src-tauri/src/backend/app_server.rs`, `/src-tauri/src/shared/codex_core.rs`
+- **Change**: 为 app-server 会话增加 `mcpServer/startupStatus/updated` 跟踪与等待逻辑，并让 `start_thread_core()` 在 `thread/start` 成功后短暂等待 MCP 从 `starting` 收敛到 `ready/error`，避免新线程首个 turn 抢在 Gemini MCP 工具真正挂载完成之前发出。
+- **Why**: 正式 daemon 已能读到 Gemini 配置并枚举 `ping` 等工具，但真实 `start_thread -> send_user_message` 紧邻调用时仍会返回“当前会话未暴露 ping 工具”；最小对照进一步证实 `codex app-server` 在线程创建后会异步经历一次 Gemini `starting -> ready`，说明这里存在首轮 turn 与 MCP 启动完成之间的竞态。
+- **Goal**: 消除首轮会话的 MCP 暴露时序问题，让 CodexMonitor 新线程的第一次消息就能稳定调用 Gemini MCP。
