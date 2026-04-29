@@ -106,19 +106,6 @@ describe("GitDiffPanel", () => {
     expect(screen.getByText(/当前运行 APP 的系统用户与仓库所有者不一致/)).toBeTruthy();
   });
 
-  it("shows a non-error notice when automatic diff loading is deferred", () => {
-    render(
-      <GitDiffPanel
-        {...baseProps}
-        deferredDiffsNotice="Heavy Git activity detected. Automatic diff loading is paused until you open a file."
-      />,
-    );
-
-    expect(
-      screen.getByText(/Heavy Git activity detected\. Automatic diff loading is paused/i),
-    ).toBeTruthy();
-  });
-
   it("enables commit when message exists and only unstaged changes", () => {
     const onCommit = vi.fn();
     render(

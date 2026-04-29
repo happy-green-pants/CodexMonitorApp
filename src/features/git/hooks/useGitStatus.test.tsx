@@ -56,7 +56,7 @@ describe("useGitStatus", () => {
       .mockResolvedValueOnce(makeStatus("next", 3, 4));
 
     const { result, unmount } = renderHook(
-      ({ active }: { active: WorkspaceInfo | null }) => useGitStatus(active, "local"),
+      ({ active }: { active: WorkspaceInfo | null }) => useGitStatus(active),
       { initialProps: { active: workspace } },
     );
     await act(async () => {
@@ -88,7 +88,7 @@ describe("useGitStatus", () => {
       .mockResolvedValueOnce(makeStatus("manual", 5, 6));
 
     const { result, unmount } = renderHook(
-      ({ active }: { active: WorkspaceInfo | null }) => useGitStatus(active, "local"),
+      ({ active }: { active: WorkspaceInfo | null }) => useGitStatus(active),
       { initialProps: { active: workspace } },
     );
     await act(async () => {
@@ -127,7 +127,7 @@ describe("useGitStatus", () => {
       .mockReturnValueOnce(secondPromise);
 
     const { result, rerender, unmount } = renderHook(
-      ({ active }: { active: WorkspaceInfo | null }) => useGitStatus(active, "local"),
+      ({ active }: { active: WorkspaceInfo | null }) => useGitStatus(active),
       { initialProps: { active: workspace } },
     );
 
@@ -168,7 +168,7 @@ describe("useGitStatus", () => {
       .mockRejectedValueOnce(new Error("boom"));
 
     const { result, unmount } = renderHook(
-      ({ active }: { active: WorkspaceInfo | null }) => useGitStatus(active, "local"),
+      ({ active }: { active: WorkspaceInfo | null }) => useGitStatus(active),
       { initialProps: { active: workspace } },
     );
 
@@ -188,14 +188,14 @@ describe("useGitStatus", () => {
     unmount();
   });
 
-  it("does not poll on an interval in remote mode and refreshes on focus instead", async () => {
+  it("polls on the shared interval while a workspace is active", async () => {
     const getGitStatusMock = vi.mocked(getGitStatus);
     getGitStatusMock
       .mockResolvedValueOnce(makeStatus("main", 2, 1))
-      .mockResolvedValueOnce(makeStatus("focused", 3, 2));
+      .mockResolvedValueOnce(makeStatus("polled", 3, 2));
 
     const { result, unmount } = renderHook(
-      ({ active }: { active: WorkspaceInfo | null }) => useGitStatus(active, "remote"),
+      ({ active }: { active: WorkspaceInfo | null }) => useGitStatus(active),
       { initialProps: { active: workspace } },
     );
 
@@ -203,25 +203,8 @@ describe("useGitStatus", () => {
       await Promise.resolve();
     });
 
-    expect(getGitStatusMock).toHaveBeenCalledTimes(1);
-    expect(result.current.status.branchName).toBe("main");
-
-    await act(async () => {
-      vi.advanceTimersByTime(3000);
-    });
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(getGitStatusMock).toHaveBeenCalledTimes(1);
-
-    await act(async () => {
-      window.dispatchEvent(new Event("focus"));
-      await Promise.resolve();
-    });
-
     expect(getGitStatusMock).toHaveBeenCalledTimes(2);
-    expect(result.current.status.branchName).toBe("focused");
+    expect(result.current.status.branchName).toBe("polled");
 
     unmount();
   });

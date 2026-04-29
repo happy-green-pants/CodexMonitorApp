@@ -2,12 +2,12 @@
 
 ## Active Changelog
 
-- Current: `/.dev_logs/changelog_v14.md`
+- Current: `/.dev_logs/changelog_v15.md`
 
 ## Current Task
 
-- 本地打包 Linux x86_64 服务后端
-- Goal: 基于当前工作树生成 `codex_monitor_daemon` 的本地 release 二进制，并验证产物可执行。
+- 统一改为 GitHub 远程编译/验证/打包流程，并修复 `v1.0.3` 远程发布中暴露的前端 TypeScript 错误
+- Goal: 当前项目后续所有编译、验证、打包都通过 GitHub Actions 完成，产物完成后再从 GitHub 下载回本地；当前优先让 `v1.0.3` 的远程 Release 构建恢复通过。
 
 ## Notes
 
@@ -20,3 +20,5 @@
 - `changelog_v11.md` approached the 100-line limit; start `changelog_v12.md` for daemon Linux release workflow fixes.
 - `changelog_v12.md` 已承载上一轮发版与远程 MCP 修复记录；当前 Android 远程恢复任务跨越前端、后端、RPC 与测试多模块，切换到 `changelog_v13.md` 继续记录。
 - `changelog_v13.md` 已接近 100 行且已混合多轮发布/远程恢复/文档任务；本轮 Web 文件编辑扩展切换到 `changelog_v14.md`，避免功能记忆串扰。
+- `changelog_v14.md` 已接近 100 行且混合 Web 文件编辑、daemon 打包与模型配置修复；本轮 Sentry Web 告警修复切换到 `changelog_v15.md`，避免继续跨主题堆叠。
+- 项目最新约定：本地环境不再承担编译、验证、打包；统一由 GitHub Actions 执行构建/校验/发布，完成后从 GitHub 下载产物回本机。

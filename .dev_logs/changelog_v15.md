@@ -48,3 +48,9 @@ State Summary (from `changelog_v14.md`):
 - **Change**: 在发布分支 `release/v1.0.3` 上将应用版本从 `1.0.2` 统一推进到 `1.0.3`，并把 Android `versionCode` 从 `7` 递增到 `8`，确保 GitHub Release / APK 构建链路与新版本号对齐。
 - **Why**: 用户要求新建分支并在原有版本基础上推进 `0.0.1`；当前基线版本是 `1.0.2`，因此本轮发布版本应为 `1.0.3`，且 Android 必须保持单调递增的安装升级序列。
 - **Goal**: 为后续推送到 GitHub、触发远程编译打包和发布 `v1.0.3` 做好版本元数据准备。
+---
+### [2026-04-29 18:07] | Agent: Codex (GPT-5)
+- **File**: `/.dev_logs/manifest.md`, `/src/features/git/components/GitDiffPanel.test.tsx`, `/src/features/git/hooks/useGitStatus.test.tsx`, `/src/utils/appServerEvents.ts`
+- **Change**: 在项目记忆中新增“所有编译、验证、打包统一走 GitHub Actions，产物再从 GitHub 下载回本地”的执行约定；同时根据 `v1.0.3` 远程构建日志修复三组前端类型错误：移除 `GitDiffPanel` 测试中已删除的 `deferredDiffsNotice` 断言、把 `useGitStatus` 测试对齐为当前单参数 hook 签名并改写轮询预期、修正 `normalizeRequestUserInputQuestions()` 对 `isOther` 的可选字段收窄，避免把 `null` 混入 `RequestUserInputQuestion[]`。
+- **Why**: `Release` workflow 的 `npm run build` 在 GitHub 远程环境中因这三组类型漂移直接失败，阻断了 APK 与 Release 资产生成；同时用户要求把后续所有验证/打包职责统一迁移到 GitHub，避免本地继续承担编译压力。
+- **Goal**: 固化新的远程构建约束，并消除当前阻断 `v1.0.3` GitHub 打包的 TypeScript 编译错误。

@@ -104,11 +104,16 @@ function normalizeRequestUserInputQuestions(value: unknown): RequestUserInputQue
         id,
         header: String(question.header ?? ""),
         question: String(question.question ?? ""),
-        isOther: Boolean(question.isOther ?? question.is_other),
+        // Preserve the optional wire shape instead of forcing false, so the
+        // normalized payload still matches the frontend request contract.
+        isOther:
+          question.isOther === undefined && question.is_other === undefined
+            ? undefined
+            : Boolean(question.isOther ?? question.is_other),
         options: normalizeRequestUserInputOptions(question.options),
       };
     })
-    .filter((question): question is RequestUserInputQuestion => Boolean(question));
+    .filter((question): question is RequestUserInputQuestion => question !== null);
 }
 
 function getAppServerMessageObject(
