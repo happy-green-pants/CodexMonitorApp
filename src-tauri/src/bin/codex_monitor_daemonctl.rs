@@ -9,6 +9,7 @@ mod types;
 
 use daemon_binary::resolve_daemon_binary_path;
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
 use std::env;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -436,6 +437,46 @@ fn trim_non_empty(value: Option<&str>) -> Option<String> {
         .map(str::trim)
         .filter(|entry| !entry.is_empty())
         .map(str::to_string)
+}
+
+fn build_daemon_launch_env(
+    home_override: Option<&str>,
+    codex_home_override: Option<&str>,
+    path_override: Option<&str>,
+) -> BTreeMap<String, String> {
+    let home = trim_non_empty(home_override)
+        .or_else(|| trim_non_empty(env::var("HOME").ok().as_deref()))
+        .or_else(|| trim_non_empty(env::var("USERPROFILE").ok().as_deref()))
+        .unwrap_or_else(|| "/root".to_string());
+    let codex_home = trim_non_empty(codex_home_override)
+        .or_else(|| trim_non_empty(env::var("CODEX_HOME").ok().as_deref()))
+        .unwrap_or_else(|| format!("{home}/.codex"));
+
+    let mut path_entries: Vec<String> = trim_non_empty(path_override)
+        .or_else(|| trim_non_empty(env::var("PATH").ok().as_deref()))
+        .map(|value| value.split(':').map(str::to_string).collect())
+        .unwrap_or_default();
+
+    // Keep daemon PATH aligned with the app-server lookup rules so the daemon
+    // can discover the same Codex/Gemini toolchain as the interactive CLI.
+    for required in [
+        "/usr/local/node/bin",
+        "/usr/local/bin",
+        "/usr/bin",
+        "/bin",
+        "/usr/sbin",
+        "/sbin",
+    ] {
+        if !path_entries.iter().any(|entry| entry == required) {
+            path_entries.push(required.to_string());
+        }
+    }
+
+    let mut envs = BTreeMap::new();
+    envs.insert("HOME".to_string(), home);
+    envs.insert("CODEX_HOME".to_string(), codex_home);
+    envs.insert("PATH".to_string(), path_entries.join(":"));
+    envs
 }
 
 fn parse_daemon_error_message(response: &Value) -> Option<String> {
@@ -1105,6 +1146,12 @@ async fn daemon_start(
         .stdout(Stdio::null())
         .stderr(Stdio::null());
 
+    // Force the daemon to inherit the same Codex home and executable search
+    // paths as the working CLI session so MCP server discovery stays aligned.
+    for (key, value) in build_daemon_launch_env(None, None, None) {
+        command.env(key, value);
+    }
+
     if insecure_no_auth {
         command.arg("--insecure-no-auth");
     } else {
@@ -1410,5 +1457,49 @@ Proto Recv-Q Send-Q Local Address           Foreign Address         State       
 tcp        0      0 0.0.0.0:47320           0.0.0.0:*               LISTEN      8765/other
 "#;
         assert_eq!(parse_netstat_listener_pid(output, 4732), None);
+    }
+
+    #[test]
+    fn daemon_launch_env_sets_codex_home_when_missing() {
+        let envs = build_daemon_launch_env(None, None, None);
+        assert_eq!(
+            envs.get("HOME").map(String::as_str),
+            Some("/root")
+        );
+        assert_eq!(
+            envs.get("CODEX_HOME").map(String::as_str),
+            Some("/root/.codex")
+        );
+        let path = envs
+            .get("PATH")
+            .expect("expected PATH to be populated for daemon launch");
+        assert!(
+            path.split(':').any(|entry| entry == "/usr/local/node/bin"),
+            "expected daemon PATH to include /usr/local/node/bin, got {path}"
+        );
+    }
+
+    #[test]
+    fn daemon_launch_env_preserves_existing_codex_home() {
+        let envs = build_daemon_launch_env(
+            Some("/srv/service"),
+            Some("/srv/service/.codex"),
+            Some("/usr/bin:/bin"),
+        );
+        assert_eq!(
+            envs.get("HOME").map(String::as_str),
+            Some("/srv/service")
+        );
+        assert_eq!(
+            envs.get("CODEX_HOME").map(String::as_str),
+            Some("/srv/service/.codex")
+        );
+        let path = envs
+            .get("PATH")
+            .expect("expected PATH to be preserved for daemon launch");
+        assert!(
+            path.split(':').any(|entry| entry == "/usr/local/node/bin"),
+            "expected daemon PATH to include /usr/local/node/bin, got {path}"
+        );
     }
 }

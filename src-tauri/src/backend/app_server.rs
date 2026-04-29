@@ -675,6 +675,7 @@ pub(crate) fn build_codex_path_env(codex_bin: Option<&str>) -> Option<String> {
         extras.extend(
             [
                 "/opt/homebrew/bin",
+                "/usr/local/node/bin",
                 "/usr/local/bin",
                 "/usr/bin",
                 "/bin",
@@ -1287,14 +1288,15 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
 #[cfg(test)]
 mod tests {
     use super::{
-        app_server_command_args, build_initialize_params, extract_related_thread_ids,
-        extract_thread_entries_from_thread_list_result, extract_thread_id, normalize_root_path,
-        resolve_workspace_for_cwd,
+        app_server_command_args, build_codex_path_env, build_initialize_params,
+        extract_related_thread_ids, extract_thread_entries_from_thread_list_result,
+        extract_thread_id, normalize_root_path, resolve_workspace_for_cwd,
         should_suppress_hidden_thread_event, source_subagent_kind,
         thread_started_is_memory_consolidation,
     };
     use serde_json::json;
     use std::collections::HashMap;
+    use std::path::PathBuf;
 
     #[test]
     fn app_server_command_args_force_search_when_missing() {
@@ -1306,6 +1308,17 @@ mod tests {
     fn app_server_command_args_do_not_duplicate_search() {
         let args = app_server_command_args(Some("--profile dev --search")).expect("args");
         assert_eq!(args, vec!["--profile", "dev", "--search", "app-server"]);
+    }
+
+    #[test]
+    fn build_codex_path_env_adds_usr_local_node_bin_on_unix() {
+        let path_env = build_codex_path_env(None).expect("path env");
+        let paths: Vec<PathBuf> = std::env::split_paths(path_env.as_ref()).collect();
+        // Codex may be installed outside the default shell PATH inherited by desktop/server processes.
+        assert!(
+            paths.iter().any(|path| path == &PathBuf::from("/usr/local/node/bin")),
+            "expected /usr/local/node/bin to be injected into PATH",
+        );
     }
 
     #[test]
