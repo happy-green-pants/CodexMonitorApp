@@ -78,3 +78,9 @@ State Summary (from `changelog_v14.md`):
 - **Change**: 将 daemon GitHub workflow 的 Linux runner 从 `ubuntu-24.04*` 下调到 `ubuntu-22.04*` 以压低 glibc 运行时基线，并在 release 上传阶段按 target 显式映射为 `codex_monitor_daemon-linux-x86_64`、`codex_monitor_daemon-linux-aarch64`、`codex_monitor_daemon-macos-x86_64`、`codex_monitor_daemon-macos-aarch64`、`codex_monitor_daemon-windows-x86_64.exe` 等全平台资产名；同时把默认发布策略更新为“Android APK + 全平台 daemon”。
 - **Why**: 实测从 `v1.0.3` Release 下载的 Linux daemon 虽然哈希正确，但在当前服务器上因要求 `GLIBC_2.39` 而无法启动；根因是 Linux runner 基线过新且 Release 资产命名不统一，不利于跨平台交付与回收。
 - **Goal**: 让 GitHub 默认发布链路稳定产出可识别、可回收、对常见 Linux 服务器更兼容的全平台 daemon 二进制，并保持 APK 发布流程不受桌面/daemon 侧复杂度拖累。
+---
+### [2026-04-29 19:20] | Agent: Codex (GPT-5)
+- **File**: `/.github/workflows/release-daemon-binaries.yml`
+- **Change**: 在 Linux daemon workflow 中新增 `Reset Linux host build cache` 步骤，在执行 `cargo build` 前删除 `src-tauri/target/release` 与当前 target 的 `release/build` 目录，强制重建 host 侧 build-script。
+- **Why**: 失败日志表明 `rust-cache` 还原的 `whisper-rs-sys` build-script 仍然链接到了更高版本的 glibc，迁移到 `ubuntu-22.04` 后一启动就因为 `GLIBC_2.39` 缺失而崩溃；仅更换 runner 不足以消除这类跨镜像缓存污染。
+- **Goal**: 让 Linux daemon 在较低 glibc 基线 runner 上从干净的 host 构建脚本重新编译，避免缓存产物继续把旧 ABI 问题带回流程中。

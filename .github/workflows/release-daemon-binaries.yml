@@ -87,6 +87,15 @@ jobs:
           echo "LIBCLANG_PATH=C:\\Program Files\\LLVM\\bin" >> $env:GITHUB_ENV
           echo "C:\\Program Files\\LLVM\\bin" >> $env:GITHUB_PATH
 
+      - name: Reset Linux host build cache
+        if: runner.os == 'Linux'
+        run: |
+          # rust-cache can restore host-side build scripts compiled on a newer
+          # glibc baseline. Rebuild them on the current runner before cargo
+          # touches whisper-rs-sys or other native crates.
+          rm -rf src-tauri/target/release
+          rm -rf src-tauri/target/${{ matrix.target }}/release/build
+
       - name: Build daemon
         run: |
           cd src-tauri
