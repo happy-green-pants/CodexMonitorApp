@@ -54,3 +54,21 @@ State Summary (from `changelog_v14.md`):
 - **Change**: 在项目记忆中新增“所有编译、验证、打包统一走 GitHub Actions，产物再从 GitHub 下载回本地”的执行约定；同时根据 `v1.0.3` 远程构建日志修复三组前端类型错误：移除 `GitDiffPanel` 测试中已删除的 `deferredDiffsNotice` 断言、把 `useGitStatus` 测试对齐为当前单参数 hook 签名并改写轮询预期、修正 `normalizeRequestUserInputQuestions()` 对 `isOther` 的可选字段收窄，避免把 `null` 混入 `RequestUserInputQuestion[]`。
 - **Why**: `Release` workflow 的 `npm run build` 在 GitHub 远程环境中因这三组类型漂移直接失败，阻断了 APK 与 Release 资产生成；同时用户要求把后续所有验证/打包职责统一迁移到 GitHub，避免本地继续承担编译压力。
 - **Goal**: 固化新的远程构建约束，并消除当前阻断 `v1.0.3` GitHub 打包的 TypeScript 编译错误。
+---
+### [2026-04-29 18:12] | Agent: Codex (GPT-5)
+- **File**: `/.dev_logs/manifest.md`
+- **Change**: 在项目记忆中补充“GitHub 产物回收只下载最终交付件，不回收无关日志包、临时 artifacts 或中间产物”的约定，明确本地只保留 APK、daemon 二进制等关键产物。
+- **Why**: 用户要求远程构建完成后仅下载关键二进制交付件，避免把非交付 artifacts 拉回本地占用空间或污染工作目录。
+- **Goal**: 让后续 GitHub 发布闭环默认只回收必要最终产物，符合当前机器磁盘与交付边界要求。
+---
+### [2026-04-29 18:12] | Agent: Codex (GPT-5)
+- **File**: `/AGENTS.md`
+- **Change**: 在仓库级执行约束中新增两条规则：默认将编译、验证、打包、发布工作交给 GitHub Actions / GitHub Release，而不是本地执行；并规定从 GitHub 回收产物时只下载 APK、daemon 二进制等最终交付件，不回收无关日志和临时 artifacts。
+- **Why**: 用户要求这条约定不仅保存在开发记忆里，也要进入仓库的长期协作契约，确保后续任何代理都不会默认走本地编译或把无关产物拉回本机。
+- **Goal**: 将远程构建与精简产物回收策略固化为项目级默认规则，减少本地磁盘占用并统一后续发布流程。
+---
+### [2026-04-29 18:20] | Agent: Codex (GPT-5)
+- **File**: `/src/utils/appServerEvents.ts`
+- **Change**: 将 `normalizeRequestUserInputQuestions()` 从 `map + filter` 改为显式循环和结果数组累积，按需写入可选的 `isOther` 字段，避免 TypeScript 把中间对象推断成“属性必有但值可为 undefined”的形态。
+- **Why**: 第二轮 `v1.0.3` 远程构建显示其余类型错误已消失，只剩这一处因谓词收窄与可选属性形状不一致而阻断 `tsc`，需要用更直接的构造方式消除推断歧义。
+- **Goal**: 清掉当前 `build frontend` 的最后一组 TypeScript 错误，让 GitHub Release workflow 能继续进入 APK 构建与发布阶段。

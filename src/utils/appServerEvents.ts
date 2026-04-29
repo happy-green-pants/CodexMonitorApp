@@ -90,30 +90,33 @@ function normalizeRequestUserInputOptions(
 
 function normalizeRequestUserInputQuestions(value: unknown): RequestUserInputQuestion[] {
   const questionsRaw = Array.isArray(value) ? value : [];
-  return questionsRaw
-    .map((entry) => {
-      const question = asRecord(entry);
-      if (!question) {
-        return null;
-      }
-      const id = asTrimmedString(question.id);
-      if (!id) {
-        return null;
-      }
-      return {
-        id,
-        header: String(question.header ?? ""),
-        question: String(question.question ?? ""),
-        // Preserve the optional wire shape instead of forcing false, so the
-        // normalized payload still matches the frontend request contract.
-        isOther:
-          question.isOther === undefined && question.is_other === undefined
-            ? undefined
-            : Boolean(question.isOther ?? question.is_other),
-        options: normalizeRequestUserInputOptions(question.options),
-      };
-    })
-    .filter((question): question is RequestUserInputQuestion => question !== null);
+  const questions: RequestUserInputQuestion[] = [];
+  for (const entry of questionsRaw) {
+    const question = asRecord(entry);
+    if (!question) {
+      continue;
+    }
+    const id = asTrimmedString(question.id);
+    if (!id) {
+      continue;
+    }
+
+    const normalizedQuestion: RequestUserInputQuestion = {
+      id,
+      header: String(question.header ?? ""),
+      question: String(question.question ?? ""),
+      options: normalizeRequestUserInputOptions(question.options),
+    };
+
+    // Preserve the optional wire shape instead of forcing false, so the
+    // normalized payload still matches the frontend request contract.
+    if (question.isOther !== undefined || question.is_other !== undefined) {
+      normalizedQuestion.isOther = Boolean(question.isOther ?? question.is_other);
+    }
+
+    questions.push(normalizedQuestion);
+  }
+  return questions;
 }
 
 function getAppServerMessageObject(
