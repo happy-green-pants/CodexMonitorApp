@@ -72,3 +72,9 @@ State Summary (from `changelog_v14.md`):
 - **Change**: 将 `normalizeRequestUserInputQuestions()` 从 `map + filter` 改为显式循环和结果数组累积，按需写入可选的 `isOther` 字段，避免 TypeScript 把中间对象推断成“属性必有但值可为 undefined”的形态。
 - **Why**: 第二轮 `v1.0.3` 远程构建显示其余类型错误已消失，只剩这一处因谓词收窄与可选属性形状不一致而阻断 `tsc`，需要用更直接的构造方式消除推断歧义。
 - **Goal**: 清掉当前 `build frontend` 的最后一组 TypeScript 错误，让 GitHub Release workflow 能继续进入 APK 构建与发布阶段。
+---
+### [2026-04-29 18:52] | Agent: Codex (GPT-5)
+- **File**: `/.github/workflows/release-daemon-binaries.yml`, `/docs/build/github-release-runbook.md`, `/AGENTS.md`, `/.dev_logs/manifest.md`
+- **Change**: 将 daemon GitHub workflow 的 Linux runner 从 `ubuntu-24.04*` 下调到 `ubuntu-22.04*` 以压低 glibc 运行时基线，并在 release 上传阶段按 target 显式映射为 `codex_monitor_daemon-linux-x86_64`、`codex_monitor_daemon-linux-aarch64`、`codex_monitor_daemon-macos-x86_64`、`codex_monitor_daemon-macos-aarch64`、`codex_monitor_daemon-windows-x86_64.exe` 等全平台资产名；同时把默认发布策略更新为“Android APK + 全平台 daemon”。
+- **Why**: 实测从 `v1.0.3` Release 下载的 Linux daemon 虽然哈希正确，但在当前服务器上因要求 `GLIBC_2.39` 而无法启动；根因是 Linux runner 基线过新且 Release 资产命名不统一，不利于跨平台交付与回收。
+- **Goal**: 让 GitHub 默认发布链路稳定产出可识别、可回收、对常见 Linux 服务器更兼容的全平台 daemon 二进制，并保持 APK 发布流程不受桌面/daemon 侧复杂度拖累。

@@ -7,7 +7,7 @@
 ## Current Task
 
 - 统一改为 GitHub 远程编译/验证/打包流程，并修复 `v1.0.3` 远程发布中暴露的前端 TypeScript 错误
-- Goal: 当前项目后续所有编译、验证、打包都通过 GitHub Actions 完成，产物完成后再从 GitHub 下载回本地；当前优先让 `v1.0.3` 的远程 Release 构建恢复通过。
+- Goal: 当前项目后续所有编译、验证、打包都通过 GitHub Actions 完成，产物完成后再从 GitHub 下载回本地；当前优先让 `v1.0.3` 的远程 Release 构建恢复通过，并将默认发布范围收敛为 Android APK + 全平台 daemon。
 
 ## Notes
 
@@ -22,3 +22,5 @@
 - `changelog_v13.md` 已接近 100 行且已混合多轮发布/远程恢复/文档任务；本轮 Web 文件编辑扩展切换到 `changelog_v14.md`，避免功能记忆串扰。
 - `changelog_v14.md` 已接近 100 行且混合 Web 文件编辑、daemon 打包与模型配置修复；本轮 Sentry Web 告警修复切换到 `changelog_v15.md`，避免继续跨主题堆叠。
 - 项目最新约定：本地环境不再承担编译、验证、打包；统一由 GitHub Actions 执行构建/校验/发布，完成后从 GitHub 下载产物回本机。
+- 产物回收约定：仅下载最终交付所需的关键产物（如 APK、daemon 二进制等），不下载无关日志、临时 artifacts 或非交付中间产物。
+- 发布约定扩展：GitHub Release 默认交付 Android APK 与全平台 daemon；Linux daemon 构建需优先使用较低 glibc 基线 runner，避免服务器侧 ABI 不兼容。

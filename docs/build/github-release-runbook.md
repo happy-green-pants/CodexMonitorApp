@@ -9,7 +9,7 @@
 - 发布目标：GitHub Release 页面
 - 当前默认发布产物：
   - Android release APK
-  - `codex_monitor_daemon` 多平台二进制（由独立 daemon workflow 追加上传）
+  - `codex_monitor_daemon` 全平台二进制（由独立 daemon workflow 追加上传）
 - 不默认承诺本流程会产出桌面 app bundle；若用户明确要求桌面安装包，需要单独确认对应签名与平台构建状态。
 
 ## 标准流程
@@ -44,9 +44,9 @@
 - 若同 tag 的 Release 已存在，使用 `gh release upload --clobber`
 - 若同 tag 的 Release 不存在，使用 `gh release create`
 
-这样可以避免桌面 bundle 的签名和 Linux 打包问题阻断 APK 发布。
+这样可以避免桌面 bundle 的签名和 GUI 打包问题阻断 APK 发布。
 
-### 4. daemon workflow 独立附加二进制
+### 4. daemon workflow 独立附加全平台 daemon 二进制
 
 当前稳定流程中：
 
@@ -54,6 +54,14 @@
 - 该 workflow 在 `v*` tag push 时自动触发
 - 其 release job 必须等待目标 Release 出现后再执行 `gh release upload`
 - daemon workflow 负责把各平台二进制追加到同一个 GitHub Release
+- 当前默认追加以下 daemon 资产：
+  - `codex_monitor_daemon-linux-x86_64`
+  - `codex_monitor_daemon-linux-aarch64`
+  - `codex_monitor_daemon-macos-x86_64`
+  - `codex_monitor_daemon-macos-aarch64`
+  - `codex_monitor_daemon-windows-x86_64.exe`
+- Linux daemon 的 GitHub runner 应优先保持较低 glibc 基线，避免在常见服务器环境下载后因 `GLIBC_x.y` 版本过高而无法运行。
+- Release 上传时必须使用显式资产名，不能把 Linux 产物继续上传成无平台后缀的裸文件名，否则会破坏下载约定并增加交付混淆。
 
 ### 5. 推送分支并移动目标 tag
 
@@ -85,7 +93,7 @@ curl -s https://api.github.com/repos/happy-green-pants/CodexMonitorApp/releases/
 完成标准：
 
 - `Release` workflow 成功，且 APK asset 已出现在目标 Release
-- `Release Daemon Binaries` workflow 成功，且 daemon 二进制已附加到目标 Release
+- `Release Daemon Binaries` workflow 成功，且全平台 daemon 二进制已附加到目标 Release
 
 ## 当前约定
 
@@ -93,7 +101,7 @@ curl -s https://api.github.com/repos/happy-green-pants/CodexMonitorApp/releases/
 
 - 发布到 `happy-green-pants/CodexMonitorApp` 的 GitHub Release
 - 主发布内容至少包含 Android APK
-- 同时追加 daemon 二进制
+- 同时追加全平台 daemon 二进制
 - 若需要重发旧版本，优先复用已有 Release 页面并重打对应 tag
 
 ## 执行清单

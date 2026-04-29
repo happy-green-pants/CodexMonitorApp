@@ -26,6 +26,10 @@ CodexMonitor is a Tauri app that orchestrates Codex agents across local workspac
 - Treat local disk space as constrained. Do not use heavy build, bundle, packaging, or release commands as routine verification for this repo.
 - Do not default to `npm run tauri:build`, `npm run tauri:build:win`, Android local packaging, or `cargo build --release` when validating changes.
 - Prefer lightweight validation that does not generate large release artifacts. Use the smallest command set that proves the touched behavior.
+- Default all compile, validation, packaging, and release work to GitHub Actions / GitHub Release workflows rather than local execution unless the user explicitly asks for a local path.
+- When retrieving finished GitHub build outputs back to the local machine, download only final deliverables needed for handoff (for example Android APKs or daemon binaries), and avoid pulling logs, temporary artifacts, or other non-deliverable intermediates unless the user explicitly asks for them.
+- GitHub Release 默认交付范围是 Android APK 加全平台 daemon 二进制；桌面 GUI 安装包不默认承诺，除非用户明确提出。
+- Linux daemon 的远程构建应优先选择较低 glibc 基线的 runner，避免产物下载回常见服务器后因 `GLIBC_x.y` 版本过高无法执行。
 - If a user asks to package, publish, or produce installable artifacts for Android, Windows, or daemon binaries, default to the GitHub workflow/release path in `docs/build/github-release-runbook.md`.
 - If `README.md` or older notes show local release commands, treat them as reference-only examples unless the user explicitly requests that local path.
 
@@ -157,7 +161,7 @@ Local release/build policy:
 GitHub release packaging default:
 
 - When the user says "打包到 GitHub" or asks to publish to GitHub Release, follow `docs/build/github-release-runbook.md`.
-- Default deliverables are the Android APK plus daemon binaries uploaded to the existing/new GitHub Release.
+- Default deliverables are the Android APK plus full-platform daemon binaries uploaded to the existing/new GitHub Release.
 - Android APK, Windows installers/bundles, and daemon release binaries should all prefer GitHub Actions / GitHub Release workflows over local artifact builds.
 - Do not assume desktop app bundles are required unless the user explicitly asks for them.
 
