@@ -72,6 +72,7 @@ describe("useAppSettings", () => {
     expect(result.current.settings.dictationModelId).toBe("base");
     expect(result.current.settings.interruptShortcut).toBeTruthy();
     expect(result.current.settings.customModelIds).toEqual([
+      "gpt-5.5",
       "gpt-5.4",
       "gpt-5.3-codex",
     ]);

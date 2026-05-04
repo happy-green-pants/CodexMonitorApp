@@ -1124,7 +1124,12 @@ fn default_selected_open_app_id() -> String {
 }
 
 fn default_custom_model_ids() -> Vec<String> {
-    vec!["gpt-5.4".to_string(), "gpt-5.3-codex".to_string()]
+    // Mirror the frontend starter list so persisted defaults stay consistent across runtimes.
+    vec![
+        "gpt-5.5".to_string(),
+        "gpt-5.4".to_string(),
+        "gpt-5.3-codex".to_string(),
+    ]
 }
 
 impl Default for AppSettings {

@@ -67,3 +67,27 @@ State Summary (from `changelog_v13.md`):
 - **Why**: 用户要求实施上一轮服务后端打包计划，本次需要交付实际可运行的本地 daemon 二进制，而不仅是构建方案。
 - **Goal**: 产出可用于本机部署或后续分发的 `codex_monitor_daemon` release 二进制，并以最小验证确认其启动参数表面行为正常。
 ---
+### [2026-04-19 00:56] | Agent: Codex (GPT-5)
+- **File**: `/src-tauri/Cargo.toml`, `/src-tauri/target/release/codex_monitor_daemon`, `/.dev_logs/changelog_v14.md`
+- **Change**: 再次按当前工作树执行 `cargo build --release --bin codex_monitor_daemon --manifest-path src-tauri/Cargo.toml`，成功生成新的 Linux x86_64 release 二进制；随后用 `src-tauri/target/release/codex_monitor_daemon --help` 完成最小可执行验证，并确认产物为约 `17M` 的 ELF 64-bit 可执行文件。
+- **Why**: 用户本轮再次要求“打包一个后端服务”，需要基于当前仓库状态重新产出后端 daemon，而不能仅引用旧日志中的历史构建结果。
+- **Goal**: 交付一份与当前工作树一致、已完成基础运行验证的本地 daemon 可执行文件，便于后续部署或手动分发。
+---
+### [2026-04-20 00:20] | Agent: Codex (GPT-5)
+- **File**: `/src-tauri/target`, `/node_modules/.vite`, `/scripts/start_daemon.sh`, `/scripts/start_daemon.ps1`, `/scripts/start_codex_monitor_daemon.sh`, `/.dev_logs/changelog_v14.md`
+- **Change**: 清理本地可重建编译缓存时保留后端服务交付物：先暂存 `src-tauri/target/release/codex_monitor_daemon`，删除 `src-tauri/target` 中除该二进制外的中间产物与 `node_modules/.vite` 前端缓存，再恢复 daemon 二进制；同时确认 `scripts/start_daemon.sh`、`scripts/start_daemon.ps1` 和 `scripts/start_codex_monitor_daemon.sh` 未被触碰。
+- **Why**: 用户要求释放编译缓存占用，但明确要求保留后端服务脚本；直接清空 `target` 会误删当前可用的 daemon 可执行文件，因此需要做选择性清理。
+- **Goal**: 在不影响后端服务启动脚本和已打包 daemon 的前提下回收磁盘空间，并保持仓库可继续用于服务分发或手动启动。
+---
+### [2026-04-28 00:15] | Agent: Codex (GPT-5)
+- **File**: `/src/features/settings/hooks/useAppSettings.test.ts`, `/src/features/settings/hooks/useSettingsDefaultModels.test.tsx`, `/src/features/models/hooks/useModels.test.tsx`, `/src/features/settings/components/SettingsView.test.tsx`
+- **Change**: 先按 TDD 调整并补充模型相关前端测试，锁定默认 `customModelIds` 需包含 `gpt-5.5`、设置页“自定义模型”文案应脱离 fallback-only 语义，以及自定义模型在服务端返回其他模型时仍需保留在候选列表中。
+- **Why**: 当前问题表现为最新模型缺失和“不能自定义添加”的感知偏差，先用失败测试固定期望，避免实现阶段继续沿用旧语义。
+- **Goal**: 为后续最小代码修改提供明确验收锚点，确保默认模型补位和自定义模型可见性按新规则生效。
+---
+### [2026-04-28 00:18] | Agent: Codex (GPT-5)
+- **File**: `/src/features/settings/hooks/useAppSettings.ts`, `/src-tauri/src/types.rs`, `/src/features/models/utils/modelListResponse.ts`, `/src/features/settings/components/sections/SettingsCodexSection.tsx`, `/.dev_logs/manifest.md`
+- **Change**: 将前后端默认 `customModelIds` 同步更新为 `gpt-5.5`、`gpt-5.4`、`gpt-5.3-codex`，并补充注释说明其用途；同时把自定义模型描述从 `Custom model fallbacks` 调整为 `Custom models`，更新帮助文案、推荐 starter IDs 和重复提示文案，使设置页明确表达“手动添加后始终可选，服务端同名元数据优先覆盖”。
+- **Why**: 根因一部分是默认补位名单过旧，另一部分是 UI 文案把现有能力表述成仅在缺失时补位，导致用户难以理解自定义模型入口和生效范围。
+- **Goal**: 修复最新模型缺失的默认体验，并让自定义模型能力在设置与模型选择链路中的行为和提示保持一致。
+---

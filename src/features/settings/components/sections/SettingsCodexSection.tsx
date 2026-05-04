@@ -253,7 +253,7 @@ export function SettingsCodexSection({
       return null;
     }
     if (duplicateCustomModelId) {
-      return "This model ID is already in the fallback list.";
+      return "This model ID is already in the custom model list.";
     }
     return null;
   }, [duplicateCustomModelId, normalizedNewCustomModelId]);
@@ -557,11 +557,11 @@ export function SettingsCodexSection({
       <div className="settings-divider" />
       <div className="settings-field">
         <div className="settings-field-label settings-field-label--section">
-          Custom model fallbacks
+          Custom models
         </div>
         <div className="settings-help">
-          Add model IDs that should appear only when the workspace does not return them in
-          <code> model/list</code>. Service-provided metadata always wins.
+          Add model IDs that should always remain selectable. When the workspace also returns the
+          same model in <code>model/list</code>, the workspace metadata wins.
         </div>
         <label className="settings-field-label" htmlFor="custom-model-add">
           New custom model ID
@@ -594,8 +594,8 @@ export function SettingsCodexSection({
         )}
         {customModelIds.length === 0 ? (
           <div className="settings-help">
-            No custom fallback models configured. Recommended starter IDs: <code>gpt-5.4</code>,{" "}
-            <code>gpt-5.3-codex</code>.
+            No custom models configured. Recommended starter IDs: <code>gpt-5.5</code>,{" "}
+            <code>gpt-5.4</code>, <code>gpt-5.3-codex</code>.
           </div>
         ) : (
           <div className="settings-field">

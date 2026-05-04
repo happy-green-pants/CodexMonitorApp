@@ -1,7 +1,7 @@
 import type { ModelOption } from "../../../types";
 
 export const CONFIG_MODEL_DESCRIPTION = "Configured in CODEX_HOME/config.toml";
-export const CUSTOM_FALLBACK_MODEL_DESCRIPTION = "Custom fallback model";
+export const CUSTOM_MODEL_DESCRIPTION = "Custom model";
 
 const DEFAULT_CUSTOM_REASONING_EFFORTS = ["low", "medium", "high", "xhigh"] as const;
 
@@ -64,7 +64,7 @@ export function createCustomFallbackModelOption(modelId: string): ModelOption {
     id: modelId,
     model: modelId,
     displayName: modelId,
-    description: CUSTOM_FALLBACK_MODEL_DESCRIPTION,
+    description: CUSTOM_MODEL_DESCRIPTION,
     supportedReasoningEfforts: DEFAULT_CUSTOM_REASONING_EFFORTS.map((reasoningEffort) => ({
       reasoningEffort,
       description: "",

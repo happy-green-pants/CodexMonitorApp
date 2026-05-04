@@ -1415,7 +1415,7 @@ describe("SettingsView Codex defaults", () => {
     });
   });
 
-  it("adds a custom fallback model from settings", async () => {
+  it("adds a custom model from settings", async () => {
     const onUpdateAppSettings = vi.fn().mockResolvedValue(undefined);
     getModelListMock.mockResolvedValue(createModelListResponse([]));
 
@@ -1437,7 +1437,7 @@ describe("SettingsView Codex defaults", () => {
     });
   });
 
-  it("edits and removes custom fallback models from settings", async () => {
+  it("edits and removes custom models from settings", async () => {
     const onUpdateAppSettings = vi.fn().mockResolvedValue(undefined);
     getModelListMock.mockResolvedValue(createModelListResponse([]));
 
@@ -1471,7 +1471,7 @@ describe("SettingsView Codex defaults", () => {
     });
   });
 
-  it("blocks empty and duplicate custom fallback model IDs", async () => {
+  it("blocks empty and duplicate custom model IDs", async () => {
     const onUpdateAppSettings = vi.fn().mockResolvedValue(undefined);
     getModelListMock.mockResolvedValue(createModelListResponse([]));
 
@@ -1497,7 +1497,7 @@ describe("SettingsView Codex defaults", () => {
     fireEvent.change(input, { target: { value: "gpt-5.4" } });
 
     expect(addButton).toHaveProperty("disabled", true);
-    expect(screen.getByText("This model ID is already in the fallback list.")).toBeTruthy();
+    expect(screen.getByText("This model ID is already in the custom model list.")).toBeTruthy();
     expect(onUpdateAppSettings).not.toHaveBeenCalled();
   });
 });

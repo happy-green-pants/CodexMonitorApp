@@ -29,6 +29,7 @@ vi.mock("./App", () => ({
 describe("main sentry bootstrap", () => {
   beforeEach(() => {
     vi.resetModules();
+    vi.unstubAllEnvs();
     sentryInitMock.mockClear();
     sentryMetricsCountMock.mockClear();
     createRootMock.mockClear();
@@ -36,7 +37,18 @@ describe("main sentry bootstrap", () => {
     document.body.innerHTML = '<div id="root"></div>';
   });
 
-  it("initializes sentry and records app_open", async () => {
+  it("does not initialize sentry when no DSN is configured", async () => {
+    vi.stubEnv("VITE_SENTRY_DSN", "");
+
+    await import("./main");
+
+    expect(sentryInitMock).not.toHaveBeenCalled();
+    expect(sentryMetricsCountMock).not.toHaveBeenCalled();
+  });
+
+  it("initializes sentry and records app_open when a DSN is configured", async () => {
+    vi.stubEnv("VITE_SENTRY_DSN", "https://examplePublicKey@o0.ingest.us.sentry.io/0");
+
     await import("./main");
 
     expect(sentryInitMock).toHaveBeenCalledTimes(1);

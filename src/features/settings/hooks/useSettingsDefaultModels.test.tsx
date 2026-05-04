@@ -180,7 +180,7 @@ describe("useSettingsDefaultModels", () => {
     });
   });
 
-  it("appends custom fallback models after provider and config models", async () => {
+  it("appends custom models after provider and config models", async () => {
     getConfigModelMock.mockResolvedValueOnce("gpt-5.4");
     getModelListMock.mockResolvedValueOnce(modelListResponse("gpt-5.2"));
 
@@ -190,7 +190,7 @@ describe("useSettingsDefaultModels", () => {
       {
         initialProps: {
           projects: [workspace("w1", true)],
-          customModelIds: ["gpt-5.4", "gpt-5.3-codex"],
+          customModelIds: ["gpt-5.5", "gpt-5.4", "gpt-5.3-codex"],
         },
       },
     );
@@ -199,7 +199,31 @@ describe("useSettingsDefaultModels", () => {
       expect(result.current.models.map((model) => model.model)).toEqual([
         "gpt-5.4",
         "gpt-5.2",
+        "gpt-5.5",
         "gpt-5.3-codex",
+      ]);
+    });
+  });
+
+  it("keeps custom models visible when provider returns different models", async () => {
+    getConfigModelMock.mockResolvedValueOnce(null);
+    getModelListMock.mockResolvedValueOnce(modelListResponse("gpt-5.2"));
+
+    const { result } = renderHook(
+      ({ projects, customModelIds }: { projects: WorkspaceInfo[]; customModelIds: string[] }) =>
+        useSettingsDefaultModels(projects, customModelIds),
+      {
+        initialProps: {
+          projects: [workspace("w1", true)],
+          customModelIds: ["gpt-5.5"],
+        },
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.models.map((model) => model.model)).toEqual([
+        "gpt-5.2",
+        "gpt-5.5",
       ]);
     });
   });

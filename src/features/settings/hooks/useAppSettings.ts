@@ -30,7 +30,8 @@ const DEFAULT_REMOTE_HTTP_ENDPOINT = "https://codex.example.com";
 const DEFAULT_REMOTE_BACKEND_ID = "remote-default";
 const DEFAULT_REMOTE_BACKEND_NAME = "Primary remote";
 const DEFAULT_REMOTE_PROVIDER: AppSettings["remoteBackendProvider"] = "tcp";
-const DEFAULT_CUSTOM_MODEL_IDS = ["gpt-5.4", "gpt-5.3-codex"];
+// Keep a small, current starter set visible even when workspace model metadata is stale.
+const DEFAULT_CUSTOM_MODEL_IDS = ["gpt-5.5", "gpt-5.4", "gpt-5.3-codex"];
 
 type RemoteBackendTarget = AppSettings["remoteBackends"][number];
 

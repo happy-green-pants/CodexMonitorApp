@@ -23,7 +23,7 @@ describe("useModels", () => {
     vi.clearAllMocks();
   });
 
-  it("adds custom fallback models when model/list does not include them", async () => {
+  it("adds custom models when model/list does not include them", async () => {
     vi.mocked(getModelList).mockResolvedValueOnce({
       result: {
         data: [
@@ -111,6 +111,38 @@ describe("useModels", () => {
 
     expect(getModelList).toHaveBeenCalledTimes(1);
     expect(getConfigModel).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps custom models available when provider returns other models", async () => {
+    vi.mocked(getModelList).mockResolvedValueOnce({
+      result: {
+        data: [
+          {
+            id: "remote-1",
+            model: "gpt-5.2",
+            displayName: "GPT-5.2",
+            supportedReasoningEfforts: [],
+            defaultReasoningEffort: null,
+            isDefault: true,
+          },
+        ],
+      },
+    });
+    vi.mocked(getConfigModel).mockResolvedValueOnce(null);
+
+    const { result } = renderHook(() =>
+      useModels({
+        activeWorkspace: workspace,
+        customModelIds: ["gpt-5.5"],
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.models.map((model) => model.model)).toEqual([
+        "gpt-5.2",
+        "gpt-5.5",
+      ]);
+    });
   });
 
   it("deduplicates config and custom fallback models by slug", async () => {
