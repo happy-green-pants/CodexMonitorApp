@@ -54,6 +54,7 @@
 - 该 workflow 在 `v*` tag push 时自动触发
 - 其 release job 必须等待目标 Release 出现后再执行 `gh release upload`
 - daemon workflow 负责把各平台二进制追加到同一个 GitHub Release
+- macOS ARM daemon 应使用显式 Apple Silicon runner 标签（当前固定为 `macos-15`），不要依赖 `macos-latest` 漂移
 - 当前默认追加以下 daemon 资产：
   - `codex_monitor_daemon-linux-x86_64`
   - `codex_monitor_daemon-linux-aarch64`
@@ -61,7 +62,7 @@
   - `codex_monitor_daemon-macos-aarch64`
   - `codex_monitor_daemon-windows-x86_64.exe`
 - Linux daemon 的 GitHub runner 应优先保持较低 glibc 基线，避免在常见服务器环境下载后因 `GLIBC_x.y` 版本过高而无法运行。
-- Release 上传时必须使用显式资产名，不能把 Linux 产物继续上传成无平台后缀的裸文件名，否则会破坏下载约定并增加交付混淆。
+- Release 上传时必须使用真实的平台化文件名，不能把多个平台产物继续上传成相同的裸文件名（例如都叫 `codex_monitor_daemon`），否则后上传的资产会覆盖先上传资产，最终导致 Release 丢失 macOS/Linux 目标文件。
 
 ### 5. 推送分支并移动目标 tag
 
@@ -94,6 +95,23 @@ curl -s https://api.github.com/repos/happy-green-pants/CodexMonitorApp/releases/
 
 - `Release` workflow 成功，且 APK asset 已出现在目标 Release
 - `Release Daemon Binaries` workflow 成功，且全平台 daemon 二进制已附加到目标 Release
+
+## v1.0.3 重发补充
+
+若 `v1.0.3` 需要补发 macOS Apple Silicon daemon：
+
+- 复用现有 `v1.0.3` Release 页面，不新建 `v1.0.3-hotfix` 之类的额外 tag
+- 先确保 `.github/workflows/release-daemon-binaries.yml` 已包含：
+  - 显式 `macos-15` Apple Silicon runner
+  - 上传前将产物重命名为真实资产名（如 `codex_monitor_daemon-macos-aarch64`）
+- 然后将远程 `v1.0.3` tag 指向包含上述 workflow 修复的提交，并重新触发 `Release` 与 `Release Daemon Binaries`
+- 验证 `v1.0.3` Release 至少包含：
+  - `CodexMonitor_1.0.3_android.apk`
+  - `codex_monitor_daemon-linux-x86_64`
+  - `codex_monitor_daemon-linux-aarch64`
+  - `codex_monitor_daemon-macos-x86_64`
+  - `codex_monitor_daemon-macos-aarch64`
+  - `codex_monitor_daemon-windows-x86_64.exe`
 
 ## 当前约定
 

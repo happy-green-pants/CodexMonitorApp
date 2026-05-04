@@ -32,11 +32,14 @@ jobs:
             target: aarch64-unknown-linux-gnu
             artifact_name: codex_monitor_daemon
             asset_name: codex_monitor_daemon-linux-aarch64
-          - os: macos-latest
+          # Use an explicit Apple Silicon runner label so the ARM macOS daemon
+          # build stays on a stable macOS baseline instead of drifting with
+          # macos-latest.
+          - os: macos-15
             target: x86_64-apple-darwin
             artifact_name: codex_monitor_daemon
             asset_name: codex_monitor_daemon-macos-x86_64
-          - os: macos-latest
+          - os: macos-15
             target: aarch64-apple-darwin
             artifact_name: codex_monitor_daemon
             asset_name: codex_monitor_daemon-macos-aarch64
@@ -74,7 +77,7 @@ jobs:
             libasound2-dev
 
       - name: Install CMake (macOS)
-        if: matrix.os == 'macos-latest'
+        if: runner.os == 'macOS'
         run: brew install cmake
 
       - name: Install LLVM (Windows)
@@ -183,8 +186,14 @@ jobs:
                     ;;
                 esac
 
+                upload_path="artifacts/${asset_name}"
+                # Give each uploaded release asset a real platform-specific
+                # filename. GitHub asset labels are not enough because files
+                # uploaded under the same basename overwrite each other.
+                cp "$file" "$upload_path"
+
                 echo "Uploading $asset_name from $file"
-                gh release upload "$TAG" "$file#$asset_name" --clobber
+                gh release upload "$TAG" "$upload_path" --clobber
               fi
             fi
           done
