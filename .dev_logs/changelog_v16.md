@@ -71,3 +71,9 @@ State Summary (from `changelog_v15.md`):
 - **Change**: 继续按 GitHub CI 日志收口残余失败：更新重仓库 diff preload 测试预期并补充注释，避免把 hook 启用状态误当成 defer 行为；低带宽开关测试改为在多个同名 button 中精确筛选带 `aria-pressed` 的真实 toggle；同时为 daemon / workspace core 的测试构造器补齐 `storage_sync_marker_ms` 与 `mcp_startup_*` 字段，并把 `Notify` 导入缩到测试作用域，给 `codex_monitor_daemonctl.rs` 补上 `build_daemon_launch_env` 引用。
 - **Why**: 新一轮 CI 日志说明前一版修复仍残留两类问题：前端测试选择器和预期没有完全对齐真实组件/实现；Rust 测试目标没有同步到新增字段与函数可见性要求。
 - **Goal**: 清掉当前已知的 JS/Rust CI 失败根因，让下一次 GitHub Actions 能继续验证低带宽与 worktree 修复主线。
+---
+### [2026-05-05 16:58] | Agent: Codex (GPT-5)
+- **File**: `/src-tauri/src/bin/codex_monitor_daemonctl.rs`, `/src-tauri/src/bin/codex_monitor_daemon.rs`
+- **Change**: 根据 `25364174509` 的 macOS Rust job 日志，修正测试作用域导入：移除 `codex_monitor_daemonctl.rs` 顶层对 `build_daemon_launch_env` 的错误引入，改为只在 `#[cfg(test)] mod tests` 中导入；同时在 `codex_monitor_daemon.rs` 的测试模块补上 `tokio::sync::Notify` 引用，匹配新增的 `WorkspaceSession` 构造字段。
+- **Why**: 前一版修复把测试依赖放到了生产模块顶层，导致 `bin` 目标与 `bin test` 目标分别出现“重复定义”和“测试作用域找不到函数/类型”的相反错误。
+- **Goal**: 让 Rust 测试在各 target 下共享一致的测试依赖作用域，消除当前 macOS/Windows 编译失败。

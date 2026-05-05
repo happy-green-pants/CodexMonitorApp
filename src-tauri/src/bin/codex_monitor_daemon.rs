@@ -1833,6 +1833,7 @@ mod tests {
     use std::sync::Arc;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tokio::process::Command;
+    use tokio::sync::Notify;
 
     #[test]
     fn usage_mentions_http_listen_option() {

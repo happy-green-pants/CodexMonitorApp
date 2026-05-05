@@ -7,7 +7,6 @@ mod storage;
 #[path = "../types.rs"]
 mod types;
 
-use crate::build_daemon_launch_env;
 use daemon_binary::resolve_daemon_binary_path;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -1326,9 +1325,9 @@ fn print_status(status: &TcpDaemonStatus, as_json: bool) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        daemon_connect_addr, daemon_listen_addr, local_listener_port, parse_netstat_listener_pid,
-        parse_port_from_remote_host, parse_ss_listener_pid, resolve_listen_addr, safe_force_stop_pid,
-        shell_quote,
+        build_daemon_launch_env, daemon_connect_addr, daemon_listen_addr, local_listener_port,
+        parse_netstat_listener_pid, parse_port_from_remote_host, parse_ss_listener_pid,
+        resolve_listen_addr, safe_force_stop_pid, shell_quote,
     };
 
     #[test]
