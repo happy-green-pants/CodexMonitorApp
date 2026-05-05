@@ -142,13 +142,9 @@ describe("SettingsServerSection", () => {
       />,
     );
 
-    const toggle = screen.getAllByRole("button").find((element) =>
-      element.getAttribute("aria-label") === "Remote low bandwidth mode"
-    );
-    expect(toggle).toBeTruthy();
-    if (!toggle) {
-      throw new Error("Remote low bandwidth mode toggle not found");
-    }
+    const toggle = screen.getByRole("button", {
+      name: "Remote low bandwidth mode",
+    });
     fireEvent.click(toggle);
 
     expect(onUpdateAppSettings).toHaveBeenCalledWith(

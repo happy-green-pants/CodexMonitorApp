@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::sync::Arc;
 
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, Notify};
 
 use crate::backend::app_server::WorkspaceSession;
 use crate::codex::args::resolve_workspace_codex_args;
@@ -181,6 +181,8 @@ mod tests {
             owner_workspace_id: "test-owner".to_string(),
             workspace_ids: Mutex::new(HashSet::from(["test-owner".to_string()])),
             workspace_roots: Mutex::new(HashMap::new()),
+            mcp_startup_status: Mutex::new(HashMap::new()),
+            mcp_startup_notify: Notify::new(),
         })
     }
 

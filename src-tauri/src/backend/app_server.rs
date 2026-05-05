@@ -1382,7 +1382,7 @@ mod tests {
     #[test]
     fn build_codex_path_env_adds_usr_local_node_bin_on_unix() {
         let path_env = build_codex_path_env(None).expect("path env");
-        let paths: Vec<PathBuf> = std::env::split_paths(path_env.as_ref()).collect();
+        let paths: Vec<PathBuf> = std::env::split_paths(&path_env).collect();
         // Codex may be installed outside the default shell PATH inherited by desktop/server processes.
         assert!(
             paths.iter().any(|path| path == &PathBuf::from("/usr/local/node/bin")),

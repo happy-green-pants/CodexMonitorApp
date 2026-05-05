@@ -59,3 +59,9 @@ State Summary (from `changelog_v15.md`):
 - **Change**: 为 daemon 的 `sync_workspaces_from_storage` 增加基于 `workspaces.json` mtime 的同步标记缓存；当存储文件未变化时跳过重复读盘、工作区覆盖与 stale session 清理。
 - **Why**: 远程 `list_workspaces` 高频触发时，daemon 之前每次都会重新读 storage 并做 prune，这在存在 worktree 的项目上会放大 IO 与状态抖动，表现为卡顿、报错以及不必要的远程资源消耗。
 - **Goal**: 让远程 daemon 在工作区清单未变化时走轻量路径，减少 worktree 场景下的重复同步开销并提升远程列表操作稳定性。
+---
+### [2026-05-05 14:04] | Agent: Codex (GPT-5)
+- **File**: `/src/features/app/hooks/useAppServerEvents.test.tsx`, `/src/features/app/hooks/useGitPanelController.test.tsx`, `/src/features/settings/components/sections/SettingsServerSection.test.tsx`, `/src-tauri/src/backend/app_server.rs`, `/src-tauri/src/shared/workspaces_core/connect.rs`, `/src-tauri/src/shared/workspaces_core/runtime_codex_args.rs`
+- **Change**: 根据 GitHub CI 失败日志修正四类问题：移除 `requestUserInput` 旧断言里对 `isOther: false` 的依赖；在 Git 面板测试中显式固定 `lowBandwidthMode: false`；把低带宽开关测试改为按 `aria-label` 精确命中真实 toggle；同时修复 Rust 测试/编译基线，给 `WorkspaceSession` 测试构造器补齐 `mcp_startup_*` 字段，并将 `split_paths(path_env.as_ref())` 改为对 `String` 的无歧义调用。
+- **Why**: 远程 CI 已明确失败，且失败分为“本轮改动引起的前端测试偏差”和“仓库当前 Rust 基线与新工具链不兼容”两类；如果不先对着日志逐项修正，就无法继续走 GitHub 编译与发布链路。
+- **Goal**: 让本轮低带宽/worktree 修复在 GitHub CI 上重新恢复可验证状态，为后续远程 Release 编译清障。

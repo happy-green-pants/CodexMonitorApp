@@ -199,6 +199,7 @@ describe("useGitPanelController preload behavior", () => {
       useGitPanelController(
         makeProps({
           gitDiffPreloadEnabled: true,
+          lowBandwidthMode: false,
         }),
       ),
     );

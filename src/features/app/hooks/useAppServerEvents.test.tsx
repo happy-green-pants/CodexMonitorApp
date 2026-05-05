@@ -307,7 +307,6 @@ describe("useAppServerEvents", () => {
             id: "confirm_path",
             header: "Confirm",
             question: "Proceed?",
-            isOther: false,
             options: [
               { label: "Yes", description: "Continue." },
               { label: "No", description: "Stop." },
@@ -514,7 +513,6 @@ describe("useAppServerEvents", () => {
             id: "q-1",
             header: "",
             question: "Choose",
-            isOther: false,
             options: [
               { label: "Yes", description: "" },
               { label: "", description: "No label" },
