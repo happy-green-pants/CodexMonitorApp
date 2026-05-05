@@ -83,3 +83,9 @@ State Summary (from `changelog_v15.md`):
 - **Change**: 根据 `25364421131` 的 Linux/macOS/Windows Rust 日志继续收口平台与契约漂移：将 `get_git_status_marks_large_mode_only_repo_as_heavy` 从断言已移除的 `loadHint` 字段改为验证原始状态列表仍完整返回 mode-only 变更；为 `build_codex_path_env_adds_usr_local_node_bin_on_unix` 增加 Unix 条件编译；把 Git runtime include 路径测试改为使用统一的斜杠归一化结果，避免 Windows 路径分隔符造成误报。
 - **Why**: 剩余失败已经不在业务实现，而在测试对旧返回结构和 Unix 路径格式的假设；继续硬追实现只会引入无意义回退。
 - **Goal**: 让跨平台 Rust 测试重新对齐当前真实契约，清掉本轮 GitHub CI 的最后一组测试误报。
+---
+### [2026-05-05 17:18] | Agent: Codex (GPT-5)
+- **File**: `/src-tauri/src/bin/codex_monitor_daemonctl.rs`
+- **Change**: 根据 `25365100312` 的三平台 Rust 日志，修正 `daemon_launch_env_sets_codex_home_when_missing` 测试：不再错误地把 runner 环境下的 `HOME`/`USERPROFILE` 断言成固定 `/root`，而是按实现逻辑验证“优先继承现有 HOME，其次 USERPROFILE，最后才回落 `/root`”；同时把 PATH 断言分成 Windows 与非 Windows 两套预期。
+- **Why**: 实现从一开始就是“复用当前运行环境的 HOME 与 PATH”，此前测试把 fallback 路径当成了通用行为，导致 Linux/macOS/Windows 全部误报。
+- **Goal**: 消除最后一个跨平台一致失败的测试断言错误，让 CI 能继续完成 Rust 验证。

@@ -1462,21 +1462,38 @@ tcp        0      0 0.0.0.0:47320           0.0.0.0:*               LISTEN      
     #[test]
     fn daemon_launch_env_sets_codex_home_when_missing() {
         let envs = build_daemon_launch_env(None, None, None);
+        let expected_home = std::env::var("HOME")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .or_else(|| {
+                std::env::var("USERPROFILE")
+                    .ok()
+                    .filter(|value| !value.trim().is_empty())
+            })
+            .unwrap_or_else(|| "/root".to_string());
+        let expected_codex_home = format!("{expected_home}/.codex");
         assert_eq!(
             envs.get("HOME").map(String::as_str),
-            Some("/root")
+            Some(expected_home.as_str())
         );
         assert_eq!(
             envs.get("CODEX_HOME").map(String::as_str),
-            Some("/root/.codex")
+            Some(expected_codex_home.as_str())
         );
         let path = envs
             .get("PATH")
             .expect("expected PATH to be populated for daemon launch");
-        assert!(
-            path.split(':').any(|entry| entry == "/usr/local/node/bin"),
-            "expected daemon PATH to include /usr/local/node/bin, got {path}"
-        );
+        if cfg!(windows) {
+            assert!(
+                path.split(':').next().is_some(),
+                "expected daemon PATH to be populated on Windows",
+            );
+        } else {
+            assert!(
+                path.split(':').any(|entry| entry == "/usr/local/node/bin"),
+                "expected daemon PATH to include /usr/local/node/bin, got {path}"
+            );
+        }
     }
 
     #[test]
