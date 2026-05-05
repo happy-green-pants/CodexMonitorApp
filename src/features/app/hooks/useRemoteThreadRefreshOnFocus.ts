@@ -7,6 +7,7 @@ export const REMOTE_THREAD_POLL_INTERVAL_MS_WHILE_PROCESSING = 3000;
 
 type UseRemoteThreadRefreshOnFocusOptions = {
   backendMode: string;
+  lowBandwidthMode?: boolean;
   activeWorkspace: WorkspaceInfo | null;
   activeThreadId: string | null;
   activeThreadIsProcessing?: boolean;
@@ -20,6 +21,7 @@ type UseRemoteThreadRefreshOnFocusOptions = {
 
 export function useRemoteThreadRefreshOnFocus({
   backendMode,
+  lowBandwidthMode = false,
   activeWorkspace,
   activeThreadId,
   activeThreadIsProcessing = false,
@@ -124,6 +126,7 @@ export function useRemoteThreadRefreshOnFocus({
       }
       if (
         !canRefresh() ||
+        lowBandwidthMode ||
         suspendPolling ||
         remoteThreadConnectionState !== "polling" ||
         !windowFocused ||
@@ -214,6 +217,7 @@ export function useRemoteThreadRefreshOnFocus({
     activeThreadId,
     activeThreadIsProcessing,
     backendMode,
+    lowBandwidthMode,
     pollIntervalMs,
     pollIntervalMsWhileProcessing,
     remoteThreadConnectionState,

@@ -25,6 +25,7 @@ type UseMainAppWorkspaceLifecycleArgs = {
   ) => Promise<void>;
   refreshWorkspaces: () => Promise<void | WorkspaceInfo[]>;
   backendMode: "local" | "remote";
+  lowBandwidthMode?: boolean;
   activeWorkspace: WorkspaceInfo | null;
   activeThreadId: string | null;
   threadStatusById: Record<string, { isProcessing: boolean }>;
@@ -43,6 +44,7 @@ export function useMainAppWorkspaceLifecycle({
   listThreadsForWorkspaces,
   refreshWorkspaces,
   backendMode,
+  lowBandwidthMode = false,
   activeWorkspace,
   activeThreadId,
   threadStatusById,
@@ -94,6 +96,7 @@ export function useMainAppWorkspaceLifecycle({
     refreshWorkspaces,
     listThreadsForWorkspaces,
     backendMode,
+    lowBandwidthMode,
     pollIntervalMs: REMOTE_WORKSPACE_REFRESH_INTERVAL_MS,
     suspended: suspendRemoteLoading,
   });
@@ -176,6 +179,7 @@ export function useMainAppWorkspaceLifecycle({
 
   useRemoteThreadRefreshOnFocus({
     backendMode,
+    lowBandwidthMode,
     activeWorkspace,
     activeThreadId,
     activeThreadIsProcessing: Boolean(

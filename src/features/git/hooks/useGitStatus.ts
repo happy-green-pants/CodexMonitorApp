@@ -23,8 +23,16 @@ const emptyStatus: GitStatusState = {
 };
 
 const REFRESH_INTERVAL_MS = 3000;
-export function useGitStatus(activeWorkspace: WorkspaceInfo | null) {
+type UseGitStatusOptions = {
+  lowBandwidthMode?: boolean;
+};
+
+export function useGitStatus(
+  activeWorkspace: WorkspaceInfo | null,
+  options: UseGitStatusOptions = {},
+) {
   const [status, setStatus] = useState<GitStatusState>(emptyStatus);
+  const { lowBandwidthMode = false } = options;
   const requestIdRef = useRef(0);
   const workspaceIdRef = useRef<string | null>(activeWorkspace?.id ?? null);
   const cachedStatusRef = useRef<Map<string, GitStatusState>>(new Map());
@@ -110,12 +118,15 @@ export function useGitStatus(activeWorkspace: WorkspaceInfo | null) {
     };
 
     fetchStatus();
+    if (lowBandwidthMode) {
+      return;
+    }
     const interval = window.setInterval(fetchStatus, REFRESH_INTERVAL_MS);
 
     return () => {
       window.clearInterval(interval);
     };
-  }, [refresh, workspaceId]);
+  }, [lowBandwidthMode, refresh, workspaceId]);
 
   return { status, refresh };
 }

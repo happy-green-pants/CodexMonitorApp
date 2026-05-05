@@ -19,10 +19,12 @@ type BrowserStoredSettings = Pick<
   | "backendMode"
   | "remoteBackendProvider"
   | "remoteBackendHost"
-  | "remoteBackendToken"
   | "remoteBackends"
   | "activeRemoteBackendId"
->;
+> & {
+  remoteBackendToken: string | null;
+  remoteLowBandwidthMode?: boolean;
+};
 
 function createBrowserRemoteError(message: string, code?: string) {
   const error = new Error(message) as Error & { code?: string };
@@ -165,6 +167,7 @@ function normalizeStoredSettings(
     remoteBackendProvider: syncedActive.provider,
     remoteBackendHost: syncedActive.host,
     remoteBackendToken: syncedActive.token,
+    remoteLowBandwidthMode: Boolean(input?.remoteLowBandwidthMode),
     remoteBackends,
     activeRemoteBackendId: syncedActive.id,
   };

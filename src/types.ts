@@ -253,6 +253,7 @@ export type AppSettings = {
   remoteBackendProvider: RemoteBackendProvider;
   remoteBackendHost: string;
   remoteBackendToken: string | null;
+  remoteLowBandwidthMode: boolean;
   remoteBackends: RemoteBackendTarget[];
   activeRemoteBackendId: string | null;
   keepDaemonRunningAfterAppClose: boolean;

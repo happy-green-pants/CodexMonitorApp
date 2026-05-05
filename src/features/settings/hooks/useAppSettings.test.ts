@@ -36,6 +36,7 @@ describe("useAppSettings", () => {
         theme: "nope" as unknown as AppSettings["theme"],
         backendMode: "remote",
         remoteBackendHost: "example:1234",
+        remoteLowBandwidthMode: true,
         personality: "unknown",
         uiFontFamily: "",
         codeFontFamily: "  ",
@@ -55,6 +56,7 @@ describe("useAppSettings", () => {
     expect(result.current.settings.personality).toBe("friendly");
     expect(result.current.settings.backendMode).toBe("remote");
     expect(result.current.settings.remoteBackendHost).toBe("example:1234");
+    expect(result.current.settings.remoteLowBandwidthMode).toBe(true);
   });
 
   it("keeps defaults when getAppSettings fails", async () => {
@@ -64,6 +66,9 @@ describe("useAppSettings", () => {
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
+    expect(result.current.settings).toMatchObject({
+      remoteLowBandwidthMode: false,
+    });
     expect(result.current.settings.uiScale).toBe(UI_SCALE_DEFAULT);
     expect(result.current.settings.theme).toBe("system");
     expect(result.current.settings.uiFontFamily).toContain("system-ui");

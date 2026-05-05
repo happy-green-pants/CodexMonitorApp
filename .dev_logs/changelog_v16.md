@@ -41,3 +41,21 @@ State Summary (from `changelog_v15.md`):
 - **Change**: 按反馈将顶栏远程端入口从“完整半透明切换弹窗”收口为“轻量 Server 入口”：按钮点击后直接打开 `Settings -> Server`，移动端仅保留紧凑入口；同时删除原有顶栏远程切换弹层与对应透明样式，并补充测试锁定 `openSettings("server")` 行为。
 - **Why**: 现有 REMOTE 弹窗透明度与主界面玻璃层冲突，文字可读性差；同时项目本就已有完整的 Server 管理面，再在顶栏复制一套切换 UI 会挤压移动端顶部空间并制造双入口分裂。
 - **Goal**: 消除顶栏弹层的可读性问题，把远程端切换/新增/测试统一收回到现有 `Settings -> Server`，只在顶栏保留低占用的快捷入口。
+---
+### [2026-05-05 16:24] | Agent: Codex (GPT-5)
+- **File**: `/src/types.ts`, `/src/features/settings/hooks/useAppSettings.ts`, `/src/features/settings/hooks/useAppSettings.test.ts`, `/src/features/settings/components/sections/SettingsServerSection.tsx`, `/src/features/settings/components/sections/SettingsServerSection.test.tsx`, `/src/features/settings/components/SettingsView.test.tsx`, `/src/services/browserRemote.ts`, `/src/services/events.test.ts`, `/src/services/tauri.test.ts`, `/src-tauri/src/types.rs`, `/src-tauri/src/storage.rs`
+- **Change**: 新增 `remoteLowBandwidthMode` 设置项，并在前端设置页、浏览器远程配置归一化与 Rust 设置模型中补齐默认值、持久化兼容与测试覆盖；Server 设置区新增低带宽模式开关。
+- **Why**: 远程部署在窄带服务器时，现有设置模型没有“减少自动流量”的控制位；新增字段如果不贯穿前后端默认值与兼容读取路径，旧配置升级时容易出现回归。
+- **Goal**: 为远程环境提供可持久化的低带宽模式基础能力，并确保配置在旧数据、浏览器回退和跨端读取场景下都能稳定工作。
+---
+### [2026-05-05 16:24] | Agent: Codex (GPT-5)
+- **File**: `/src/features/workspaces/hooks/useWorkspaceRefreshOnFocus.ts`, `/src/features/workspaces/hooks/useWorkspaceRefreshOnFocus.test.tsx`, `/src/features/app/hooks/useRemoteThreadRefreshOnFocus.ts`, `/src/features/app/hooks/useRemoteThreadRefreshOnFocus.test.tsx`, `/src/features/git/hooks/useGitStatus.ts`, `/src/features/git/hooks/useGitStatus.test.tsx`, `/src/features/git/hooks/useGitLog.ts`, `/src/features/workspaces/hooks/useWorkspaceFiles.ts`, `/src/features/app/hooks/useWorkspaceFileListing.ts`, `/src/features/app/hooks/useMainAppWorkspaceLifecycle.ts`, `/src/features/app/hooks/useMainAppGitState.ts`, `/src/features/app/hooks/useMainAppComposerWorkspaceState.ts`, `/src/features/app/components/MainApp.tsx`
+- **Change**: 将 `remoteLowBandwidthMode` 透传到远程 workspace、thread、git status、git log 与文件列表相关 hooks；低带宽模式下关闭后台轮询，仅保留首次加载、手动刷新和窗口重新聚焦后的必要同步，并补充对应测试。
+- **Why**: 远程 workspace、线程和 Git 面板此前存在多路定时轮询，在高延迟或小带宽服务器上会明显放大卡顿、报错与无效请求；保留显式刷新与 focus 恢复，比粗暴停功能更稳妥。
+- **Goal**: 在不破坏核心远程操作链路的前提下，显著降低远程模式持续请求频率，改善 worktree / workspace 远程使用稳定性。
+---
+### [2026-05-05 16:24] | Agent: Codex (GPT-5)
+- **File**: `/src-tauri/src/bin/codex_monitor_daemon.rs`
+- **Change**: 为 daemon 的 `sync_workspaces_from_storage` 增加基于 `workspaces.json` mtime 的同步标记缓存；当存储文件未变化时跳过重复读盘、工作区覆盖与 stale session 清理。
+- **Why**: 远程 `list_workspaces` 高频触发时，daemon 之前每次都会重新读 storage 并做 prune，这在存在 worktree 的项目上会放大 IO 与状态抖动，表现为卡顿、报错以及不必要的远程资源消耗。
+- **Goal**: 让远程 daemon 在工作区清单未变化时走轻量路径，减少 worktree 场景下的重复同步开销并提升远程列表操作稳定性。

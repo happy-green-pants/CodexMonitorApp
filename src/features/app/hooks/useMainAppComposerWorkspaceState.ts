@@ -55,6 +55,7 @@ type UseMainAppComposerWorkspaceStateArgs = {
     | "followUpMessageBehavior"
     | "experimentalAppsEnabled"
     | "pauseQueuedMessagesWhenResponseRequired"
+    | "remoteLowBandwidthMode"
   >;
   models: {
     models: ModelOption[];
@@ -173,6 +174,7 @@ export function useMainAppComposerWorkspaceState({
       tabletTab,
       rightPanelCollapsed,
       hasComposerSurface: showComposer || showWorkspaceHome,
+      lowBandwidthMode: settings.remoteLowBandwidthMode,
       onDebug: addDebugEntry,
     });
 

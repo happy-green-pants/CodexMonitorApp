@@ -7,6 +7,7 @@ type UseWorkspaceFilesOptions = {
   onDebug?: (entry: DebugEntry) => void;
   enabled?: boolean;
   pollingEnabled?: boolean;
+  lowBandwidthMode?: boolean;
 };
 
 function areStringArraysEqual(a: string[], b: string[]) {
@@ -29,6 +30,7 @@ export function useWorkspaceFiles({
   onDebug,
   enabled = true,
   pollingEnabled,
+  lowBandwidthMode = false,
 }: UseWorkspaceFilesOptions) {
   const [files, setFiles] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -44,7 +46,7 @@ export function useWorkspaceFiles({
   const workspaceId = activeWorkspace?.id ?? null;
   const isConnected = Boolean(activeWorkspace?.connected);
   const isEnabled = enabled;
-  const isPollingEnabled = pollingEnabled ?? isEnabled;
+  const isPollingEnabled = !lowBandwidthMode && (pollingEnabled ?? isEnabled);
 
   const refreshFiles = useCallback(async () => {
     if (!workspaceId || !isConnected || !isEnabled) {

@@ -11,6 +11,7 @@ type WorkspaceRefreshOptions = {
     options?: { preserveState?: boolean; allWorkspaces?: WorkspaceInfo[] },
   ) => Promise<void>;
   backendMode?: string;
+  lowBandwidthMode?: boolean;
   pollIntervalMs?: number;
   suspended?: boolean;
 };
@@ -20,6 +21,7 @@ export function useWorkspaceRefreshOnFocus({
   refreshWorkspaces,
   listThreadsForWorkspaces,
   backendMode = "local",
+  lowBandwidthMode = false,
   pollIntervalMs = REMOTE_WORKSPACE_REFRESH_INTERVAL_MS,
   suspended = false,
 }: WorkspaceRefreshOptions) {
@@ -28,6 +30,7 @@ export function useWorkspaceRefreshOnFocus({
     refreshWorkspaces,
     listThreadsForWorkspaces,
     backendMode,
+    lowBandwidthMode,
     pollIntervalMs,
     suspended,
   });
@@ -37,6 +40,7 @@ export function useWorkspaceRefreshOnFocus({
       refreshWorkspaces,
       listThreadsForWorkspaces,
       backendMode,
+      lowBandwidthMode,
       pollIntervalMs,
       suspended,
     };
@@ -87,10 +91,14 @@ export function useWorkspaceRefreshOnFocus({
         clearInterval(pollTimer);
         pollTimer = null;
       }
-      const { backendMode: currentBackendMode, pollIntervalMs: intervalMs } =
-        optionsRef.current;
+      const {
+        backendMode: currentBackendMode,
+        lowBandwidthMode: currentLowBandwidthMode,
+        pollIntervalMs: intervalMs,
+      } = optionsRef.current;
       if (
         optionsRef.current.suspended ||
+        currentLowBandwidthMode ||
         currentBackendMode !== "remote" ||
         document.visibilityState !== "visible"
       ) {
@@ -135,5 +143,5 @@ export function useWorkspaceRefreshOnFocus({
         clearInterval(pollTimer);
       }
     };
-  }, [backendMode, pollIntervalMs, suspended]);
+  }, [backendMode, lowBandwidthMode, pollIntervalMs, suspended]);
 }

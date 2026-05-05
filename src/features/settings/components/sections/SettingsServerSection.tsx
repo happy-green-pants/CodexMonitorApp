@@ -347,10 +347,10 @@ export function SettingsServerSection({
           </>
         )}
 
-        {supportsDesktopControls && (
-          <SettingsToggleRow
-            title="Keep daemon running after app closes"
-            subtitle="If disabled, CodexMonitor stops managed TCP daemon processes before exit."
+      {supportsDesktopControls && (
+        <SettingsToggleRow
+          title="Keep daemon running after app closes"
+          subtitle="If disabled, CodexMonitor stops managed TCP daemon processes before exit."
           >
             <SettingsToggleSwitch
               pressed={appSettings.keepDaemonRunningAfterAppClose}
@@ -363,6 +363,22 @@ export function SettingsServerSection({
             />
           </SettingsToggleRow>
         )}
+
+        <SettingsToggleRow
+          title="Remote low bandwidth mode"
+          subtitle="Reduce automatic remote refresh traffic for slower server links. Manual actions still run immediately."
+        >
+          <SettingsToggleSwitch
+            aria-label="Remote low bandwidth mode"
+            pressed={appSettings.remoteLowBandwidthMode}
+            onClick={() =>
+              void onUpdateAppSettings({
+                ...appSettings,
+                remoteLowBandwidthMode: !appSettings.remoteLowBandwidthMode,
+              })
+            }
+          />
+        </SettingsToggleRow>
 
         <div className="settings-field">
           <div className="settings-field-label">Remote server / Endpoint</div>

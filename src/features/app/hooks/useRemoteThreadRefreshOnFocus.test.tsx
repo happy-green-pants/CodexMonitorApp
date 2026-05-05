@@ -374,4 +374,44 @@ describe("useRemoteThreadRefreshOnFocus", () => {
     });
     expect(refreshThread).toHaveBeenCalledTimes(1);
   });
+
+  it("disables polling in low bandwidth mode but still refreshes on focus", async () => {
+    const refreshThread = vi.fn().mockResolvedValue(undefined);
+
+    renderHook(() =>
+      useRemoteThreadRefreshOnFocus({
+        backendMode: "remote",
+        activeWorkspace: {
+          id: "ws-1",
+          name: "Workspace",
+          path: "/tmp/ws-1",
+          connected: true,
+          settings: { sidebarCollapsed: false },
+        },
+        activeThreadId: "thread-1",
+        activeThreadIsProcessing: true,
+        remoteThreadConnectionState: "polling",
+        refreshThread,
+        lowBandwidthMode: true,
+      }),
+    );
+
+    refreshThread.mockClear();
+
+    await act(async () => {
+      vi.advanceTimersByTime(20_000);
+      await Promise.resolve();
+    });
+    expect(refreshThread).toHaveBeenCalledTimes(0);
+
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      vi.advanceTimersByTime(500);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(refreshThread).toHaveBeenCalledTimes(1);
+    expect(refreshThread).toHaveBeenCalledWith("ws-1", "thread-1");
+  });
 });

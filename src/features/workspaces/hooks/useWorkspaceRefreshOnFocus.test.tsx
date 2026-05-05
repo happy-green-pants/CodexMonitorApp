@@ -209,4 +209,48 @@ describe("useWorkspaceRefreshOnFocus", () => {
     expect(refreshWorkspaces).toHaveBeenCalledTimes(0);
     expect(listThreadsForWorkspaces).toHaveBeenCalledTimes(0);
   });
+
+  it("disables remote polling in low bandwidth mode while keeping focus refresh", async () => {
+    const refreshWorkspaces = vi.fn().mockResolvedValue([
+      {
+        id: "ws-1",
+        name: "Workspace",
+        path: "/tmp/ws-1",
+        connected: true,
+        settings: { sidebarCollapsed: false },
+      },
+    ]);
+    const listThreadsForWorkspaces = vi.fn().mockResolvedValue(undefined);
+
+    renderHook(() =>
+      useWorkspaceRefreshOnFocus({
+        workspaces: [],
+        refreshWorkspaces,
+        listThreadsForWorkspaces,
+        backendMode: "remote",
+        pollIntervalMs: 1000,
+        lowBandwidthMode: true,
+      }),
+    );
+
+    refreshWorkspaces.mockClear();
+    listThreadsForWorkspaces.mockClear();
+
+    await act(async () => {
+      vi.advanceTimersByTime(5000);
+      await Promise.resolve();
+    });
+
+    expect(refreshWorkspaces).toHaveBeenCalledTimes(0);
+
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      vi.advanceTimersByTime(500);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(refreshWorkspaces).toHaveBeenCalledTimes(1);
+    expect(listThreadsForWorkspaces).toHaveBeenCalledTimes(1);
+  });
 });

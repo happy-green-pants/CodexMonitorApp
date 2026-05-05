@@ -16,6 +16,7 @@ type UseWorkspaceFileListingArgs = {
   tabletTab: TabletTabKey;
   rightPanelCollapsed: boolean;
   hasComposerSurface: boolean;
+  lowBandwidthMode?: boolean;
   onDebug?: (entry: DebugEntry) => void;
 };
 
@@ -35,6 +36,7 @@ export function useWorkspaceFileListing({
   tabletTab,
   rightPanelCollapsed,
   hasComposerSurface,
+  lowBandwidthMode = false,
   onDebug,
 }: UseWorkspaceFileListingArgs): UseWorkspaceFileListingResult {
   const [fileAutocompleteActive, setFileAutocompleteActive] = useState(false);
@@ -63,6 +65,7 @@ export function useWorkspaceFileListing({
     onDebug,
     enabled: shouldFetchFiles,
     pollingEnabled: filePanelVisible,
+    lowBandwidthMode,
   });
 
   return { files, isLoading, setFileAutocompleteActive };

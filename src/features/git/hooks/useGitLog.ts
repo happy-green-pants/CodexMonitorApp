@@ -27,11 +27,16 @@ const emptyState: GitLogState = {
 };
 
 const REFRESH_INTERVAL_MS = 10000;
+type UseGitLogOptions = {
+  lowBandwidthMode?: boolean;
+};
 
 export function useGitLog(
   activeWorkspace: WorkspaceInfo | null,
   enabled: boolean,
+  options: UseGitLogOptions = {},
 ) {
+  const { lowBandwidthMode = false } = options;
   const [state, setState] = useState<GitLogState>(emptyState);
   const requestIdRef = useRef(0);
   const workspaceIdRef = useRef<string | null>(activeWorkspace?.id ?? null);
@@ -100,13 +105,16 @@ export function useGitLog(
       return;
     }
     void refresh();
+    if (lowBandwidthMode) {
+      return;
+    }
     const interval = window.setInterval(() => {
       refresh().catch(() => {});
     }, REFRESH_INTERVAL_MS);
     return () => {
       window.clearInterval(interval);
     };
-  }, [activeWorkspace, enabled, refresh]);
+  }, [activeWorkspace, enabled, lowBandwidthMode, refresh]);
 
   return {
     entries: state.entries,

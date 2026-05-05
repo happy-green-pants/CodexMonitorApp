@@ -203,8 +203,49 @@ describe("useGitStatus", () => {
       await Promise.resolve();
     });
 
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
     expect(getGitStatusMock).toHaveBeenCalledTimes(2);
     expect(result.current.status.branchName).toBe("polled");
+
+    unmount();
+  });
+
+  it("disables background polling in low bandwidth mode while preserving manual refresh", async () => {
+    const getGitStatusMock = vi.mocked(getGitStatus);
+    getGitStatusMock
+      .mockResolvedValueOnce(makeStatus("main", 2, 1))
+      .mockResolvedValue(makeStatus("manual", 4, 3));
+
+    const { result, unmount } = renderHook(
+      ({ active }: { active: WorkspaceInfo | null }) =>
+        useGitStatus(active, { lowBandwidthMode: true }),
+      { initialProps: { active: workspace } },
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(getGitStatusMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(10_000);
+      await Promise.resolve();
+    });
+
+    expect(getGitStatusMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await result.current.refresh();
+    });
+
+    expect(getGitStatusMock).toHaveBeenCalledTimes(2);
+    expect(result.current.status.branchName).toBe("manual");
 
     unmount();
   });

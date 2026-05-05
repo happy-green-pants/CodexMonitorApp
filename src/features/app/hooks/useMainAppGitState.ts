@@ -31,6 +31,7 @@ type UseMainAppGitStateOptions = {
     gitDiffIgnoreWhitespaceChanges: boolean;
     splitChatDiffView: boolean;
     reviewDeliveryMode: "inline" | "detached";
+    remoteLowBandwidthMode: boolean;
   };
   addDebugEntry: (entry: DebugEntry) => void;
   updateWorkspaceSettings: Parameters<typeof useGitRootSelection>[0]["updateWorkspaceSettings"];
@@ -162,6 +163,7 @@ export function useMainAppGitState({
     gitDiffPreloadEnabled: appSettings.preloadGitDiffs,
     gitDiffIgnoreWhitespaceChanges: appSettings.gitDiffIgnoreWhitespaceChanges,
     splitChatDiffView: appSettings.splitChatDiffView,
+    lowBandwidthMode: appSettings.remoteLowBandwidthMode,
     isCompact,
     isTablet,
     activeTab,

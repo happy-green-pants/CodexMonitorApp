@@ -389,6 +389,8 @@ pub(crate) struct AppSettings {
     pub(crate) remote_backend_host: String,
     #[serde(default, rename = "remoteBackendToken")]
     pub(crate) remote_backend_token: Option<String>,
+    #[serde(default, rename = "remoteLowBandwidthMode")]
+    pub(crate) remote_low_bandwidth_mode: bool,
     #[serde(default = "default_remote_backends", rename = "remoteBackends")]
     pub(crate) remote_backends: Vec<RemoteBackendTarget>,
     #[serde(default, rename = "activeRemoteBackendId")]
@@ -1141,6 +1143,7 @@ impl Default for AppSettings {
             remote_backend_provider: RemoteBackendProvider::Tcp,
             remote_backend_host: default_remote_backend_host(),
             remote_backend_token: None,
+            remote_low_bandwidth_mode: false,
             remote_backends: default_remote_backends(),
             active_remote_backend_id: None,
             keep_daemon_running_after_app_close: false,

@@ -134,6 +134,7 @@ describe("tauri invoke wrappers", () => {
       remoteBackendProvider: "http",
       remoteBackendHost: "https://monitor.example.com",
       remoteBackendToken: "token-1",
+      remoteLowBandwidthMode: false,
       remoteBackends: [],
       activeRemoteBackendId: "remote-default",
     });
@@ -369,6 +370,7 @@ describe("tauri invoke wrappers", () => {
       remoteBackendProvider: "http",
       remoteBackendHost: "https://codex.example.com",
       remoteBackendToken: "token-1",
+      remoteLowBandwidthMode: false,
       remoteBackends: [],
       activeRemoteBackendId: "remote-default",
     });
@@ -430,6 +432,7 @@ describe("tauri invoke wrappers", () => {
       remoteBackendProvider: "http",
       remoteBackendHost: "https://codex.example.com",
       remoteBackendToken: "token-2",
+      remoteLowBandwidthMode: false,
       remoteBackends: [],
       activeRemoteBackendId: "remote-default",
     });

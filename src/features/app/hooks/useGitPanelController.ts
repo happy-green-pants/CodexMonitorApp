@@ -20,6 +20,7 @@ export function useGitPanelController({
   gitDiffPreloadEnabled,
   gitDiffIgnoreWhitespaceChanges,
   splitChatDiffView,
+  lowBandwidthMode = false,
   isCompact,
   isTablet,
   activeTab,
@@ -34,6 +35,7 @@ export function useGitPanelController({
   gitDiffPreloadEnabled: boolean;
   gitDiffIgnoreWhitespaceChanges: boolean;
   splitChatDiffView: boolean;
+  lowBandwidthMode?: boolean;
   isCompact: boolean;
   isTablet: boolean;
   activeTab: "home" | "projects" | "codex" | "git" | "log";
@@ -69,6 +71,7 @@ export function useGitPanelController({
 
   const { status: gitStatus, refresh: refreshGitStatus } = useGitStatus(
     activeWorkspace,
+    { lowBandwidthMode },
   );
   const gitStatusRefreshTimeoutRef = useRef<number | null>(null);
   const activeWorkspaceIdRef = useRef<string | null>(activeWorkspace?.id ?? null);
@@ -171,7 +174,7 @@ export function useGitPanelController({
     isLoading: gitLogLoading,
     error: gitLogError,
     refresh: refreshGitLog,
-  } = useGitLog(activeWorkspace, shouldLoadGitLog);
+  } = useGitLog(activeWorkspace, shouldLoadGitLog, { lowBandwidthMode });
 
   const {
     diffs: gitCommitDiffs,

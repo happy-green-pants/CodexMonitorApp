@@ -104,6 +104,7 @@ describe("events subscriptions", () => {
       remoteBackendProvider: "http",
       remoteBackendHost: "https://codex.example.com",
       remoteBackendToken: "token-1",
+      remoteLowBandwidthMode: false,
       remoteBackends: [],
       activeRemoteBackendId: "remote-default",
     });

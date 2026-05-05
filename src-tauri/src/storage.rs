@@ -248,4 +248,24 @@ mod tests {
         assert!(settings.custom_model_ids.is_empty());
         assert_eq!(settings.theme, "dark");
     }
+
+    #[test]
+    fn read_settings_defaults_remote_low_bandwidth_mode_to_false() {
+        let temp_dir = std::env::temp_dir().join(format!("codex-monitor-test-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&temp_dir).expect("create temp dir");
+        let path = temp_dir.join("settings.json");
+
+        std::fs::write(
+            &path,
+            r#"{
+  "backendMode": "remote",
+  "theme": "dark"
+}"#,
+        )
+        .expect("write settings");
+
+        let settings = read_settings(&path).expect("read settings");
+        assert!(!settings.remote_low_bandwidth_mode);
+        assert_eq!(settings.theme, "dark");
+    }
 }

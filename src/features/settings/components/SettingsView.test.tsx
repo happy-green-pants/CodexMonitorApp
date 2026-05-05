@@ -66,6 +66,7 @@ const baseSettings: AppSettings = {
   remoteBackendProvider: "tcp",
   remoteBackendHost: "127.0.0.1:4732",
   remoteBackendToken: null,
+  remoteLowBandwidthMode: false,
   remoteBackends: [
     {
       id: "remote-default",

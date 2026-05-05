@@ -163,6 +163,7 @@ struct DaemonState {
     workspaces: Mutex<HashMap<String, WorkspaceEntry>>,
     sessions: Mutex<HashMap<String, Arc<WorkspaceSession>>>,
     storage_path: PathBuf,
+    storage_sync_marker_ms: Mutex<Option<u128>>,
     settings_path: PathBuf,
     app_settings: Mutex<AppSettings>,
     event_sink: DaemonEventSink,
@@ -212,6 +213,7 @@ impl DaemonState {
             workspaces: Mutex::new(workspaces),
             sessions: Mutex::new(HashMap::new()),
             storage_path,
+            storage_sync_marker_ms: Mutex::new(None),
             settings_path,
             app_settings: Mutex::new(app_settings),
             event_sink,
@@ -231,6 +233,18 @@ impl DaemonState {
     }
 
     async fn sync_workspaces_from_storage(&self) {
+        let next_marker = std::fs::metadata(&self.storage_path)
+            .ok()
+            .and_then(|metadata| metadata.modified().ok())
+            .and_then(|value| value.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|value| value.as_millis());
+        {
+            let marker = self.storage_sync_marker_ms.lock().await;
+            if *marker == next_marker {
+                return;
+            }
+        }
+
         let stored = match read_workspaces(&self.storage_path) {
             Ok(stored) => stored,
             Err(err) => {
@@ -245,6 +259,10 @@ impl DaemonState {
         {
             let mut workspaces = self.workspaces.lock().await;
             *workspaces = stored;
+        }
+        {
+            let mut marker = self.storage_sync_marker_ms.lock().await;
+            *marker = next_marker;
         }
 
         let stale_sessions: Vec<(String, Arc<WorkspaceSession>)> = {

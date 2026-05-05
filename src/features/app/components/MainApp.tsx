@@ -671,6 +671,7 @@ export default function MainApp() {
       gitDiffIgnoreWhitespaceChanges: appSettings.gitDiffIgnoreWhitespaceChanges,
       splitChatDiffView: appSettings.splitChatDiffView,
       reviewDeliveryMode: appSettings.reviewDeliveryMode,
+      remoteLowBandwidthMode: appSettings.remoteLowBandwidthMode,
     },
     addDebugEntry,
     updateWorkspaceSettings,
@@ -1279,6 +1280,7 @@ export default function MainApp() {
       experimentalAppsEnabled: appSettings.experimentalAppsEnabled,
       pauseQueuedMessagesWhenResponseRequired:
         appSettings.pauseQueuedMessagesWhenResponseRequired,
+      remoteLowBandwidthMode: appSettings.remoteLowBandwidthMode,
     },
     models: {
       models,
@@ -1390,6 +1392,7 @@ export default function MainApp() {
     listThreadsForWorkspaces,
     refreshWorkspaces,
     backendMode: appSettings.backendMode,
+    lowBandwidthMode: appSettings.remoteLowBandwidthMode,
     activeWorkspace,
     activeThreadId,
     threadStatusById,

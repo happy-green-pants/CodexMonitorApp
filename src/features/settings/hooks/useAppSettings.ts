@@ -166,6 +166,7 @@ function buildDefaultSettings(): AppSettings {
     remoteBackendProvider: defaultRemote.provider,
     remoteBackendHost: defaultRemote.host,
     remoteBackendToken: null,
+    remoteLowBandwidthMode: false,
     remoteBackends: [defaultRemote],
     activeRemoteBackendId: defaultRemote.id,
     keepDaemonRunningAfterAppClose: false,
@@ -305,6 +306,7 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
         : true,
     reviewDeliveryMode:
       settings.reviewDeliveryMode === "detached" ? "detached" : "inline",
+    remoteLowBandwidthMode: Boolean(settings.remoteLowBandwidthMode),
     chatHistoryScrollbackItems,
     commitMessagePrompt,
     openAppTargets: normalizedTargets,

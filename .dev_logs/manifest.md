@@ -6,8 +6,8 @@
 
 ## Current Task
 
-- 修复 GitHub daemon Release 资产命名与 macOS Apple Silicon 构建标签，并重发 v1.0.3 资产
-- Goal: 让 v1.0.3 GitHub Release 在保留 Android APK 的同时，稳定附加 Linux、Windows、macOS Intel 与 macOS Apple Silicon daemon 二进制，避免同名资产覆盖导致的缺件。
+- 远程 workspace/worktree 卡顿治理，并新增远程低带宽模式以减少服务器链路开销
+- Goal: 修复远程 daemon 高频同步工作区带来的卡顿与报错，降低远程自动轮询与持续连接压力，让窄带服务器上的远程项目使用更稳定。
 
 ## Notes
 
