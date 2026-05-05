@@ -90,6 +90,7 @@ import {
   subscribeTrayOpenThread,
 } from "@services/events";
 import { setWorkspaceRuntimeCodexArgs } from "@services/tauri";
+import { RemoteBackendSwitcher } from "@app/components/RemoteBackendSwitcher";
 
 const SettingsView = lazy(() =>
   import("@settings/components/SettingsView").then((module) => ({
@@ -1974,6 +1975,11 @@ export default function MainApp() {
     !activeWorkspace?.connected
       ? "disconnected"
       : remoteThreadConnectionState;
+  const remoteSwitcherNode = (
+    <RemoteBackendSwitcher
+      onOpenServerSettings={() => modalActions.openSettings("server")}
+    />
+  );
   const mainAppShellProps = useMainAppShellProps({
     shell: {
       appClassName,
@@ -2039,6 +2045,7 @@ export default function MainApp() {
       hasActiveWorkspace: Boolean(activeWorkspace),
       backendMode: appSettings.backendMode,
       remoteThreadConnectionState: compactThreadConnectionState,
+      remoteSwitcherNode,
     },
   });
 

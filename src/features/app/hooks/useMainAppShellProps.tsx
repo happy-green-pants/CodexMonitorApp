@@ -1,5 +1,5 @@
 import { SidebarCollapseButton } from "@/features/layout/components/SidebarToggleControls";
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { MainAppShell } from "@app/components/MainAppShell";
 
 type UseMainAppShellPropsArgs = {
@@ -23,6 +23,7 @@ type UseMainAppShellPropsArgs = {
     hasActiveWorkspace: boolean;
     backendMode: "local" | "remote";
     remoteThreadConnectionState: "live" | "polling" | "disconnected";
+    remoteSwitcherNode?: ReactNode;
   };
 };
 
@@ -34,7 +35,7 @@ export function useMainAppShellProps({
 }: UseMainAppShellPropsArgs) {
   const showThreadConnectionIndicator =
     topbar.hasActiveWorkspace && topbar.backendMode === "remote";
-  const topbarActionsNode = showThreadConnectionIndicator ? (
+  const threadConnectionIndicator = showThreadConnectionIndicator ? (
     <span
       className={`compact-workspace-live-indicator ${
         topbar.remoteThreadConnectionState === "live"
@@ -58,6 +59,13 @@ export function useMainAppShellProps({
           : "Disconnected"}
     </span>
   ) : null;
+  const topbarActionsNode =
+    topbar.remoteSwitcherNode || threadConnectionIndicator ? (
+      <>
+        {topbar.remoteSwitcherNode ?? null}
+        {threadConnectionIndicator}
+      </>
+    ) : null;
 
   const desktopTopbarLeftNodeWithToggle = !topbar.isCompact ? (
     <div className="topbar-leading">

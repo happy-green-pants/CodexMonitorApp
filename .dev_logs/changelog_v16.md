@@ -89,3 +89,9 @@ State Summary (from `changelog_v15.md`):
 - **Change**: 根据 `25365100312` 的三平台 Rust 日志，修正 `daemon_launch_env_sets_codex_home_when_missing` 测试：不再错误地把 runner 环境下的 `HOME`/`USERPROFILE` 断言成固定 `/root`，而是按实现逻辑验证“优先继承现有 HOME，其次 USERPROFILE，最后才回落 `/root`”；同时把 PATH 断言分成 Windows 与非 Windows 两套预期。
 - **Why**: 实现从一开始就是“复用当前运行环境的 HOME 与 PATH”，此前测试把 fallback 路径当成了通用行为，导致 Linux/macOS/Windows 全部误报。
 - **Goal**: 消除最后一个跨平台一致失败的测试断言错误，让 CI 能继续完成 Rust 验证。
+---
+### [2026-05-05 17:31] | Agent: Codex (GPT-5)
+- **File**: `/src/features/app/components/RemoteBackendSwitcher.tsx`, `/src/features/app/components/MainApp.tsx`, `/src/styles/remote-switcher.css`
+- **Change**: 将顶部 Server 快捷入口收口为纯图标按钮，移除非手机场景下的远程名称文本显示；同时取消此前“仅 remote/mobile/web 才显示”的挂载条件，改为所有终端尺寸都显示该入口，并把按钮样式改成固定尺寸的图标胶囊。
+- **Why**: 当前需求要求顶部只保留一个图标，且移动端也必须显示；继续保留桌面文字标签会占用 topbar 空间，并与“统一单图标入口”目标冲突。
+- **Goal**: 让顶部远程入口在桌面和移动端都保持一致、紧凑的单图标表现，同时仍能一跳进入 `Settings -> Server`。

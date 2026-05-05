@@ -8,6 +8,7 @@ export type SettingsSection =
   | "shortcuts"
   | "open-apps"
   | "git"
+  | "server"
   | "codex"
   | "features";
 

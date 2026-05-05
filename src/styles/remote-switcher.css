@@ -1,0 +1,13 @@
+.remote-switcher-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 999px;
+  padding: 0;
+  color: var(--text);
+  border-color: var(--border-subtle);
+  background: var(--surface-card);
+}
