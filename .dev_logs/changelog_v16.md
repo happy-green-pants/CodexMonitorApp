@@ -77,3 +77,9 @@ State Summary (from `changelog_v15.md`):
 - **Change**: 根据 `25364174509` 的 macOS Rust job 日志，修正测试作用域导入：移除 `codex_monitor_daemonctl.rs` 顶层对 `build_daemon_launch_env` 的错误引入，改为只在 `#[cfg(test)] mod tests` 中导入；同时在 `codex_monitor_daemon.rs` 的测试模块补上 `tokio::sync::Notify` 引用，匹配新增的 `WorkspaceSession` 构造字段。
 - **Why**: 前一版修复把测试依赖放到了生产模块顶层，导致 `bin` 目标与 `bin test` 目标分别出现“重复定义”和“测试作用域找不到函数/类型”的相反错误。
 - **Goal**: 让 Rust 测试在各 target 下共享一致的测试依赖作用域，消除当前 macOS/Windows 编译失败。
+---
+### [2026-05-05 17:09] | Agent: Codex (GPT-5)
+- **File**: `/src-tauri/src/shared/git_ui_core/tests.rs`, `/src-tauri/src/backend/app_server.rs`, `/src-tauri/src/shared/git_runtime.rs`
+- **Change**: 根据 `25364421131` 的 Linux/macOS/Windows Rust 日志继续收口平台与契约漂移：将 `get_git_status_marks_large_mode_only_repo_as_heavy` 从断言已移除的 `loadHint` 字段改为验证原始状态列表仍完整返回 mode-only 变更；为 `build_codex_path_env_adds_usr_local_node_bin_on_unix` 增加 Unix 条件编译；把 Git runtime include 路径测试改为使用统一的斜杠归一化结果，避免 Windows 路径分隔符造成误报。
+- **Why**: 剩余失败已经不在业务实现，而在测试对旧返回结构和 Unix 路径格式的假设；继续硬追实现只会引入无意义回退。
+- **Goal**: 让跨平台 Rust 测试重新对齐当前真实契约，清掉本轮 GitHub CI 的最后一组测试误报。

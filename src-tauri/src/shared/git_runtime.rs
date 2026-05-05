@@ -303,9 +303,17 @@ mod tests {
         let global =
             std::fs::read_to_string(&context.global_config_path).expect("read global config");
         let xdg = std::fs::read_to_string(&context.xdg_config_path).expect("read xdg config");
+        let expected_xdg_include = format!(
+            "path = {}",
+            xdg_dir.join("git/config").to_string_lossy().replace('\\', "/")
+        );
+        let expected_home_include = format!(
+            "path = {}",
+            home_dir.join(".gitconfig").to_string_lossy().replace('\\', "/")
+        );
 
-        assert!(global.contains(&format!("path = {}/git/config", xdg_dir.to_string_lossy())));
-        assert!(global.contains(&format!("path = {}/.gitconfig", home_dir.to_string_lossy())));
+        assert!(global.contains(&expected_xdg_include));
+        assert!(global.contains(&expected_home_include));
         assert_eq!(xdg, APP_MANAGED_SAFE_DIRECTORY_CONFIG);
     }
 

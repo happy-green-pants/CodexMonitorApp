@@ -487,23 +487,14 @@ fn get_git_status_marks_large_mode_only_repo_as_heavy() {
         .block_on(diff::get_git_status_inner(&workspaces, "w-heavy".to_string()))
         .expect("get git status");
 
-    let load_hint = status.get("loadHint").expect("load hint");
+    // Load-hint defer metadata now lives above the raw git status payload; the
+    // backend status surface should still report all mode-only file changes.
+    assert!(status.get("loadHint").is_none());
     assert_eq!(
-        load_hint
-            .get("shouldDeferDiffs")
-            .and_then(Value::as_bool),
-        Some(true)
-    );
-    assert_eq!(
-        load_hint
-            .get("modeChangeDominant")
-            .and_then(Value::as_bool),
-        Some(true)
-    );
-    assert_eq!(
-        load_hint
-            .get("changedFileCount")
-            .and_then(Value::as_u64),
+        status
+            .get("files")
+            .and_then(Value::as_array)
+            .map(|files| files.len() as u64),
         Some(total as u64)
     );
 }

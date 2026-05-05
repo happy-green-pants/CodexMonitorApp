@@ -1379,6 +1379,7 @@ mod tests {
         assert_eq!(args, vec!["--profile", "dev", "--search", "app-server"]);
     }
 
+    #[cfg(unix)]
     #[test]
     fn build_codex_path_env_adds_usr_local_node_bin_on_unix() {
         let path_env = build_codex_path_env(None).expect("path env");
