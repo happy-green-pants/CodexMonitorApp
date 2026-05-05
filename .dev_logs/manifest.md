@@ -2,12 +2,12 @@
 
 ## Active Changelog
 
-- Current: `/.dev_logs/changelog_v16.md`
+- Current: `/.dev_logs/changelog_v17.md`
 
 ## Current Task
 
-- 远程 workspace/worktree 卡顿治理，并新增远程低带宽模式以减少服务器链路开销
-- Goal: 修复远程 daemon 高频同步工作区带来的卡顿与报错，降低远程自动轮询与持续连接压力，让窄带服务器上的远程项目使用更稳定。
+- 推送并发布 `v1.0.4` GitHub Release
+- Goal: 将仓库版本号、Android 版本序列与 GitHub tag 对齐，通过 GitHub Actions 产出 Android APK 与全平台 daemon 二进制。
 
 ## Notes
 
@@ -23,6 +23,7 @@
 - `changelog_v14.md` 已接近 100 行且混合 Web 文件编辑、daemon 打包与模型配置修复；本轮 Sentry Web 告警修复切换到 `changelog_v15.md`，避免继续跨主题堆叠。
 - `changelog_v15.md` 已接近 100 行；本轮 Git 忽略规则调整切换到 `changelog_v16.md`，避免继续在 Sentry / GitHub 发布修复分片上叠加无关主题。
 - `changelog_v16.md` 当前继续承载仓库级 Git 忽略与远程端快速切换主题；后续若再跨 5 个独立模块或接近 100 行，需要继续分片。
+- `changelog_v16.md` 已达到 97 行；本轮 `v1.0.4` 发版涉及版本元数据与发布动作，切换到 `changelog_v17.md` 记录，避免继续超出单分片行数约束。
 - 项目最新约定：本地环境不再承担编译、验证、打包；统一由 GitHub Actions 执行构建/校验/发布，完成后从 GitHub 下载产物回本机。
 - 产物回收约定：仅下载最终交付所需的关键产物（如 APK、daemon 二进制等），不下载无关日志、临时 artifacts 或非交付中间产物。
 - 发布约定扩展：GitHub Release 默认交付 Android APK 与全平台 daemon；Linux daemon 构建需优先使用较低 glibc 基线 runner，避免服务器侧 ABI 不兼容。
