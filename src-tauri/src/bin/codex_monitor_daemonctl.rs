@@ -7,6 +7,7 @@ mod storage;
 #[path = "../types.rs"]
 mod types;
 
+use crate::build_daemon_launch_env;
 use daemon_binary::resolve_daemon_binary_path;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;

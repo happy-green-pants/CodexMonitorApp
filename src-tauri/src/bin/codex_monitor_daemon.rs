@@ -1902,6 +1902,7 @@ mod tests {
             workspaces: Mutex::new(HashMap::new()),
             sessions: Mutex::new(HashMap::new()),
             storage_path: data_dir.join("workspaces.json"),
+            storage_sync_marker_ms: Mutex::new(None),
             settings_path: data_dir.join("settings.json"),
             app_settings: Mutex::new(AppSettings::default()),
             event_sink: DaemonEventSink { tx },
@@ -1974,6 +1975,8 @@ mod tests {
             workspace_ids: Mutex::new(HashSet::from([owner_workspace_id.clone()])),
             workspace_roots: Mutex::new(HashMap::new()),
             owner_workspace_id,
+            mcp_startup_status: Mutex::new(HashMap::new()),
+            mcp_startup_notify: Notify::new(),
         })
     }
 

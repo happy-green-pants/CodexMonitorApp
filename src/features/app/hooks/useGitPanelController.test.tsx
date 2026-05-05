@@ -204,7 +204,9 @@ describe("useGitPanelController preload behavior", () => {
       ),
     );
 
-    expect(getLastEnabledArg()).toBe(false);
+    // The controller still enables the diffs hook for preloading; heavy-repo defer
+    // happens deeper in the git data pipeline rather than by disabling the hook here.
+    expect(getLastEnabledArg()).toBe(true);
 
     act(() => {
       result.current.handleSelectDiff("src/main.ts");

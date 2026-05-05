@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::sync::Arc;
 
-use tokio::sync::{Mutex, Notify};
+use tokio::sync::Mutex;
 
 use crate::backend::app_server::WorkspaceSession;
 use crate::codex::args::resolve_workspace_codex_args;
@@ -133,7 +133,7 @@ mod tests {
     use std::sync::Arc;
 
     use tokio::process::Command;
-    use tokio::sync::Mutex;
+    use tokio::sync::{Mutex, Notify};
 
     use crate::types::{WorkspaceKind, WorkspaceSettings};
 

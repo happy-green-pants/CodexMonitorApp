@@ -65,3 +65,9 @@ State Summary (from `changelog_v15.md`):
 - **Change**: 根据 GitHub CI 失败日志修正四类问题：移除 `requestUserInput` 旧断言里对 `isOther: false` 的依赖；在 Git 面板测试中显式固定 `lowBandwidthMode: false`；把低带宽开关测试改为按 `aria-label` 精确命中真实 toggle；同时修复 Rust 测试/编译基线，给 `WorkspaceSession` 测试构造器补齐 `mcp_startup_*` 字段，并将 `split_paths(path_env.as_ref())` 改为对 `String` 的无歧义调用。
 - **Why**: 远程 CI 已明确失败，且失败分为“本轮改动引起的前端测试偏差”和“仓库当前 Rust 基线与新工具链不兼容”两类；如果不先对着日志逐项修正，就无法继续走 GitHub 编译与发布链路。
 - **Goal**: 让本轮低带宽/worktree 修复在 GitHub CI 上重新恢复可验证状态，为后续远程 Release 编译清障。
+---
+### [2026-05-05 16:42] | Agent: Codex (GPT-5)
+- **File**: `/src/features/app/hooks/useGitPanelController.test.tsx`, `/src/features/settings/components/sections/SettingsServerSection.test.tsx`, `/src-tauri/src/bin/codex_monitor_daemon.rs`, `/src-tauri/src/bin/codex_monitor_daemonctl.rs`, `/src-tauri/src/shared/workspaces_core/connect.rs`, `/src-tauri/src/shared/workspaces_core/runtime_codex_args.rs`
+- **Change**: 继续按 GitHub CI 日志收口残余失败：更新重仓库 diff preload 测试预期并补充注释，避免把 hook 启用状态误当成 defer 行为；低带宽开关测试改为在多个同名 button 中精确筛选带 `aria-pressed` 的真实 toggle；同时为 daemon / workspace core 的测试构造器补齐 `storage_sync_marker_ms` 与 `mcp_startup_*` 字段，并把 `Notify` 导入缩到测试作用域，给 `codex_monitor_daemonctl.rs` 补上 `build_daemon_launch_env` 引用。
+- **Why**: 新一轮 CI 日志说明前一版修复仍残留两类问题：前端测试选择器和预期没有完全对齐真实组件/实现；Rust 测试目标没有同步到新增字段与函数可见性要求。
+- **Goal**: 清掉当前已知的 JS/Rust CI 失败根因，让下一次 GitHub Actions 能继续验证低带宽与 worktree 修复主线。
